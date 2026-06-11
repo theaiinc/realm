@@ -22,6 +22,7 @@ theaiincrealm/
 ### Architecture TL;DR
 - Realm is an **execution abstraction layer** — agents hit a universal API, engines handle the runtime
 - MVP has two engines: Container (Docker) and Browser (Playwright)
+- Ubuntu Desktop (Docker with XFCE/Xvfb/VNC) added for Yggdrasil Ratatoskr computer-use tasks
 - macOS VM (Apple Virtualization Framework) is V2
 - Oasis Cognition replaces Mythos as the agent runtime
 - Pathway orchestrates workflows on top
@@ -50,3 +51,5 @@ pnpm test                    # Run all tests (51 tests across 4 packages)
 4. **Veil pipeline does offline regex PII detection** — no external API needed for basic patterns. Production should use `@theaiinc/veil` npm package for more sophisticated detection.
 5. **PermissionManager** implements default-deny with an optional async request handler. Caches grants per realm for the session lifetime.
 6. **The PRD was rewritten from v1 to v2.0** — Realm changed from a VM product to an execution abstraction layer. The plan and codebase follow v2.0.
+7. **realm-ubuntu** (`@theaiinc/realm-ubuntu`) is a Ubuntu Desktop engine using Docker + XFCE4 + Xvfb + x11vnc. Uses `xdotool` for input (click, type, keypress, scroll) and ImageMagick `import` for screenshots — faster and lighter than pyautogui. The Dockerfile in `assets/Dockerfile` builds `realm-ubuntu` image with browsers, Node 22, Python3, git, gh CLI, and all dev tools for Yggdrasil Ratatoskr tasks.
+8. **Ratatoskr is embedded in every realm container** — `@theaiinc/yggdrasil-ratatoskr` is installed globally in the Docker image. The `start-realm.sh` entrypoint launches it automatically when `YGGDRASIL_URL` env var is set. Pass Yggdrasil config via `RealmConfig.environment` (e.g. `YGGDRASIL_URL`, `API_KEY`, `CAPABILITIES`). The UbuntuManager injects `host.docker.internal:host-gateway` so Ratatoskr can reach the host's Yggdrasil instance.

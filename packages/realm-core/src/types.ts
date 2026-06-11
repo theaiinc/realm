@@ -9,6 +9,7 @@ export enum EngineType {
   Container = 'container',
   Browser = 'browser',
   VM = 'vm',
+  Ubuntu = 'ubuntu',
 }
 
 /** Network access levels */

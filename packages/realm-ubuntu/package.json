@@ -1,8 +1,8 @@
 {
-  "name": "@theaiinc/realm-container",
+  "name": "@theaiinc/realm-ubuntu",
   "version": "0.1.0",
-  "description": "Docker-based container engine for Realm — provides isolated Linux sandboxes with filesystem, network, and lifecycle management",
-  "keywords": ["realm", "docker", "container", "sandbox", "ai-agent", "execution-environment"],
+  "description": "Ubuntu Desktop engine for Realm — provides a full XFCE4 desktop environment in Docker with VNC, Chromium, and embedded Yggdrasil Ratatoskr for AI agent computer-use tasks",
+  "keywords": ["realm", "ubuntu", "desktop", "docker", "xfce", "vnc", "ratatoskr", "yggdrasil", "ai-agent", "computer-use"],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,12 +16,14 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
+    "build:docker": "docker build -t realm-ubuntu -f assets/Dockerfile .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/"
   },
   "dependencies": {
     "@theaiinc/realm-core": "workspace:*",
+    "@theaiinc/yggdrasil-ratatoskr": "^0.2.0",
     "dockerode": "^4.0.0"
   },
   "devDependencies": {
@@ -37,6 +39,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/theaiinc/realm.git",
-    "directory": "packages/realm-container"
+    "directory": "packages/realm-ubuntu"
   }
 }

@@ -4,6 +4,7 @@ import { RealmAPI, AuditLogger } from '@theaiinc/realm-core';
 import type { RealmConfig } from '@theaiinc/realm-core';
 import { ContainerEngine } from '@theaiinc/realm-container';
 import { BrowserEngine } from '@theaiinc/realm-browser';
+import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
 import { VeilPipeline } from '@theaiinc/realm-veil';
 
 interface RealmServerOptions {
@@ -22,6 +23,7 @@ export async function createServer(options?: RealmServerOptions) {
   // Register engines
   api.registerEngine(new ContainerEngine());
   api.registerEngine(new BrowserEngine());
+  api.registerEngine(new UbuntuEngine());
 
   const app = Fastify({ logger: true });
 

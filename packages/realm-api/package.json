@@ -1,7 +1,8 @@
 {
   "name": "@theaiinc/realm-api",
   "version": "0.1.0",
-  "private": true,
+  "description": "Fastify HTTP API server for Realm — exposes realm lifecycle, execution, and audit endpoints over REST",
+  "keywords": ["realm", "api", "fastify", "rest", "ai-agent", "orchestration"],
   "type": "module",
   "scripts": {
     "build": "tsup src/server.ts --format esm --clean",
@@ -12,6 +13,7 @@
     "@theaiinc/realm-core": "workspace:*",
     "@theaiinc/realm-container": "workspace:*",
     "@theaiinc/realm-browser": "workspace:*",
+    "@theaiinc/realm-ubuntu": "workspace:*",
     "@theaiinc/realm-veil": "workspace:*",
     "fastify": "^4.28.0",
     "@fastify/cors": "^9.0.0"
@@ -20,5 +22,14 @@
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",
     "vitest": "^3.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theaiinc/realm.git",
+    "directory": "packages/realm-api"
   }
 }
