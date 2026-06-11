@@ -1,0 +1,23 @@
+{
+  "name": "@theaiinc/realm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Realm \u2014 isolated AI execution environment platform",
+  "scripts": {
+    "build": "pnpm -r --filter='./packages/*' exec npx tsup src/index.ts --format esm --dts --clean || true && cd packages/realm-api && npx tsup src/server.ts --format esm --clean && cd ../../packages/realm-cli && npx tsup src/cli.ts --format esm --clean",
+    "test": "cd packages/realm-core && npx vitest run && cd ../../packages/realm-container && npx vitest run && cd ../../packages/realm-browser && npx vitest run && cd ../../packages/realm-veil && npx vitest run",
+    "realm": "node packages/realm-cli/dist/cli.js",
+    "realm:api": "node packages/realm-api/dist/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "cpu-features",
+      "ssh2",
+      "protobufjs"
+    ]
+  }
+}

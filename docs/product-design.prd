@@ -1,0 +1,679 @@
+Realm PRD
+
+AI Execution Environment Platform
+
+Version: 2.0
+
+Status: Proposed
+
+Owner: The AI Inc
+
+Related Projects:
+
+* Oasis Cognition Agent
+* Pathway
+* Veil
+
+⸻
+
+Vision
+
+Realm is an isolated execution environment where AI agents can safely perform tasks using browsers, files, terminals, APIs, and applications without requiring unrestricted access to the user’s machine.
+
+Realm abstracts execution environments behind a common interface, allowing Pathway and Oasis Cognition agents to operate consistently across containers, browsers, and virtual machines.
+
+Core Philosophy:
+
+“Agents should work inside realms, not on computers.”
+
+⸻
+
+Problem
+
+Current AI agents have two major problems.
+
+Problem 1: Excessive Permissions
+
+Most agents require:
+
+* Screen Recording
+* Accessibility Access
+* Full Filesystem Access
+
+Users are forced to trust the AI with their entire machine.
+
+⸻
+
+Problem 2: Lack of Reproducibility
+
+Agent environments vary between users.
+
+Examples:
+
+* Different browsers
+* Different software versions
+* Different operating systems
+
+This causes unreliable behavior.
+
+⸻
+
+Solution
+
+Realm introduces isolated execution environments.
+
+The agent never works directly on the host machine.
+
+Instead:
+
+Host
+
+↓
+
+Realm
+
+↓
+
+Agent
+
+↓
+
+Task
+
+The host machine becomes an orchestrator rather than the execution target.
+
+⸻
+
+Product Strategy
+
+Realm is not a VM product.
+
+Realm is an execution abstraction layer.
+
+Supported execution engines:
+
+Realm Container
+
+Realm Browser
+
+Realm VM
+
+Future Realm Cloud
+
+Agents do not care which environment executes the task.
+
+⸻
+
+User Story
+
+User says:
+
+“Research the top AI coding tools and prepare a report.”
+
+Pathway creates workflow.
+
+Oasis Cognition Agent executes workflow.
+
+Realm provides environment.
+
+Result:
+
+PDF report exported to user.
+
+User never grants desktop access.
+
+⸻
+
+Core Concepts
+
+Realm
+
+A self-contained execution environment.
+
+Properties:
+
+* isolated filesystem
+* isolated memory
+* isolated network policies
+* isolated applications
+
+Examples:
+
+research-realm
+
+coding-realm
+
+marketing-realm
+
+⸻
+
+Execution Engine
+
+Backend implementation.
+
+Supported:
+
+Container Engine
+
+Browser Engine
+
+Virtual Machine Engine
+
+Future Cloud Engine
+
+⸻
+
+Workspace
+
+Persistent storage.
+
+Contains:
+
+documents
+
+downloads
+
+agent artifacts
+
+workflow outputs
+
+workspace memory
+
+⸻
+
+Session
+
+Running instance of a Realm.
+
+Example:
+
+realm.start()
+
+session.active()
+
+session.stop()
+
+⸻
+
+MVP Scope
+
+Realm Container
+
+Realm Browser
+
+Pathway Integration
+
+Veil Integration
+
+Oasis Cognition Agent Integration
+
+⸻
+
+Out Of Scope
+
+macOS Virtual Machines
+
+Windows Virtual Machines
+
+Cloud Hosting
+
+Multi-user Collaboration
+
+Mobile Devices
+
+GPU Workloads
+
+⸻
+
+Architecture
+
+User
+
+↓
+
+Pathway
+
+↓
+
+Oasis Cognition Agent
+
+↓
+
+Realm API
+
+↓
+
+Execution Engine
+
+↓
+
+Applications
+
+⸻
+
+Realm Container
+
+Primary execution engine for V1.
+
+Technology:
+
+Docker
+
+Containerd
+
+OCI Images
+
+Purpose:
+
+Coding
+
+Research
+
+Automation
+
+File Processing
+
+Data Extraction
+
+Agent Workflows
+
+⸻
+
+Container Capabilities
+
+Filesystem
+
+Terminal
+
+Package Management
+
+Git
+
+Node.js
+
+Python
+
+Browser
+
+Network Access
+
+⸻
+
+Container Restrictions
+
+No Host Filesystem Access
+
+No Host Clipboard
+
+No Host Applications
+
+No Host Keychain
+
+No Host Desktop
+
+⸻
+
+Realm Browser
+
+Dedicated browser environment.
+
+Technology:
+
+Chromium
+
+Playwright
+
+CDP
+
+Purpose:
+
+Browsing
+
+Research
+
+Shopping
+
+Booking
+
+Forms
+
+Web Applications
+
+⸻
+
+Browser Capabilities
+
+Screenshots
+
+Tab Management
+
+Downloads
+
+Uploads
+
+Cookies
+
+Session Persistence
+
+DOM Access
+
+⸻
+
+Browser Isolation
+
+Separate Profiles
+
+Separate Storage
+
+Separate Cookies
+
+Separate Credentials
+
+⸻
+
+Realm API
+
+Universal API.
+
+Agent does not know which engine is running.
+
+Example:
+
+realm.open()
+
+realm.capture()
+
+realm.click()
+
+realm.type()
+
+realm.download()
+
+realm.export()
+
+realm.close()
+
+⸻
+
+Filesystem Model
+
+Every realm receives:
+
+/workspace
+
+/input
+
+/output
+
+/tmp
+
+Only workspace is persistent.
+
+⸻
+
+Import System
+
+Host
+
+↓
+
+Import
+
+↓
+
+Realm Workspace
+
+Files are copied.
+
+No direct mount by default.
+
+⸻
+
+Export System
+
+Realm
+
+↓
+
+Approval
+
+↓
+
+Host
+
+Exports require explicit user approval.
+
+⸻
+
+Veil Integration
+
+All outbound data passes through Veil.
+
+Examples:
+
+Screenshots
+
+Documents
+
+Logs
+
+Reports
+
+⸻
+
+Supported Detection
+
+PII
+
+API Keys
+
+Passwords
+
+Access Tokens
+
+Credit Cards
+
+Identity Documents
+
+Secrets
+
+⸻
+
+Pathway Integration
+
+Pathway becomes the orchestration layer.
+
+Example:
+
+Research Competitors
+
+↓
+
+Open Browser Realm
+
+↓
+
+Collect Data
+
+↓
+
+Generate Report
+
+↓
+
+Export PDF
+
+⸻
+
+Oasis Cognition Agent Integration
+
+Oasis Cognition Agent operates inside Realm.
+
+Capabilities:
+
+Observe
+
+Plan
+
+Act
+
+Verify
+
+Recover
+
+⸻
+
+Snapshot System
+
+Realm states can be saved.
+
+Use Cases:
+
+Recovery
+
+Templates
+
+Testing
+
+Agent Replay
+
+⸻
+
+Templates
+
+Prebuilt environments.
+
+Coding Template
+
+Research Template
+
+Data Analysis Template
+
+Marketing Template
+
+Customer Support Template
+
+⸻
+
+Audit Trail
+
+Every action recorded.
+
+Example:
+
+09:01 Realm Created
+
+09:02 Chrome Opened
+
+09:03 Search Executed
+
+09:05 Report Generated
+
+09:06 PDF Exported
+
+⸻
+
+Security Model
+
+Principle:
+
+Default Deny
+
+Nothing is accessible unless explicitly granted.
+
+Permissions:
+
+Internet
+
+File Import
+
+File Export
+
+Clipboard
+
+Shared Folder
+
+⸻
+
+Future Roadmap
+
+V2
+
+macOS Realm
+
+Based on Apple Virtualization Framework.
+
+Use Cases:
+
+Xcode
+
+Safari
+
+Mail
+
+Calendar
+
+Native Mac Applications
+
+⸻
+
+V3
+
+Windows Realm
+
+Linux Realm
+
+Cloud Realm
+
+⸻
+
+V4
+
+Distributed Realms
+
+Multi-Agent Collaboration
+
+Persistent Agent Workers
+
+Autonomous Background Tasks
+
+⸻
+
+Success Metrics
+
+Realm Startup
+
+< 3 seconds
+
+Workflow Success Rate
+
+95%
+
+Agent Recovery Rate
+
+90%
+
+Host Data Leakage
+
+0 incidents
+
+Average Task Cost
+
+50% lower than VM-based execution
+
+⸻
+
+Product Tagline
+
+Realm
+
+A world built for agents.
+
+Compared to the previous VM-centric version, this one aligns much better with your startup reality:
+
+* Realm V1 can be built mostly with Docker + Playwright.
+* Pathway becomes immediately useful.
+* Veil has a clear place in the architecture.
+* Later, macOS Realm becomes just another execution engine, not the entire product.
+
+That’s a much more defensible architecture because competitors can copy “AI + VM”, but it’s harder to copy a unified execution layer that can transparently switch between Browser, Container, VM, and Cloud realms.
