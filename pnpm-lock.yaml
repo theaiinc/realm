@@ -117,8 +117,8 @@ importers:
         specifier: workspace:*
         version: link:../realm-core
       '@theaiinc/yggdrasil-ratatoskr':
-        specifier: ^0.2.0
-        version: 0.2.3
+        specifier: ^0.3.0
+        version: 0.3.8
       dockerode:
         specifier: ^4.0.0
         version: 4.0.12
@@ -536,8 +536,8 @@ packages:
     resolution: {integrity: sha512-MZMbiUs+jNyWu8ohhmcXlf0alV6WqypPTLbVchrFBLZ7UI7BkzdQJs5me1CAc2RZXLpFJIP189Pu4Bl7zmZVJA==}
     engines: {node: '>=18'}
 
-  '@theaiinc/yggdrasil-ratatoskr@0.2.3':
-    resolution: {integrity: sha512-ENGcszCw6AiPqzsr5JMG3kVeGG+xmMigBuR293dnl4r8NG3W4eoxhSEYal8s5S+yY0a62/liwnrN3gMLuiQvvw==}
+  '@theaiinc/yggdrasil-ratatoskr@0.3.8':
+    resolution: {integrity: sha512-CviQEdybmEJBvk+Cf3daARpwoH/3ROnousxQ+JFsPiwTGfHjmmLUaxCz2Moudojm4i774cLflhPQZg4be+elLw==}
     engines: {node: '>=18.0.0'}
 
   '@types/chai@5.2.3':
@@ -1657,7 +1657,7 @@ snapshots:
 
   '@theaiinc/veil@0.1.1': {}
 
-  '@theaiinc/yggdrasil-ratatoskr@0.2.3':
+  '@theaiinc/yggdrasil-ratatoskr@0.3.8':
     dependencies:
       axios: 1.17.0
       nanoid: 5.1.11
