@@ -53,3 +53,33 @@ pnpm test                    # Run all tests (51 tests across 4 packages)
 6. **The PRD was rewritten from v1 to v2.0** — Realm changed from a VM product to an execution abstraction layer. The plan and codebase follow v2.0.
 7. **realm-ubuntu** (`@theaiinc/realm-ubuntu`) is a Ubuntu Desktop engine using Docker + XFCE4 + Xvfb + x11vnc. Uses `xdotool` for input (click, type, keypress, scroll) and ImageMagick `import` for screenshots — faster and lighter than pyautogui. The Dockerfile in `assets/Dockerfile` builds `realm-ubuntu` image with browsers, Node 22, Python3, git, gh CLI, and all dev tools for Yggdrasil Ratatoskr tasks.
 8. **Ratatoskr is embedded in every realm container** — `@theaiinc/yggdrasil-ratatoskr` is installed globally in the Docker image. The `start-realm.sh` entrypoint launches it automatically when `YGGDRASIL_URL` env var is set. Pass Yggdrasil config via `RealmConfig.environment` (e.g. `YGGDRASIL_URL`, `API_KEY`, `CAPABILITIES`). The UbuntuManager injects `host.docker.internal:host-gateway` so Ratatoskr can reach the host's Yggdrasil instance.
+
+### CI automated npm publish
+
+When a GitHub Release is created (tag pushed), `.github/workflows/publish.yml` runs automatically:
+
+1. Checks out the release commit
+2. Installs pnpm, Node 18, and dependencies (`pnpm install --frozen-lockfile`)
+3. Builds all packages (`pnpm build`)
+4. Derives the target package from the release tag (e.g. `core-v0.2.0` → `packages/realm-core`)
+5. Publishes to npm with `--provenance`
+
+**Supported tag prefixes:**
+
+| Tag prefix | Package |
+|---|---|
+| `api-v*` | `@theaiinc/realm-api` |
+| `browser-v*` | `@theaiinc/realm-browser` |
+| `cli-v*` | `@theaiinc/realm-cli` |
+| `container-v*` | `@theaiinc/realm-container` |
+| `core-v*` | `@theaiinc/realm-core` |
+| `ubuntu-v*` | `@theaiinc/realm-ubuntu` |
+| `veil-v*` | `@theaiinc/realm-veil` |
+
+Requires `NPM_TOKEN` secret in the GitHub repository — an npm automation token with publish scope.
+
+#### One-time setup
+
+1. Generate an npm automation token: https://www.npmjs.com/settings/~/tokens
+2. Add it as a repository secret at `Settings → Secrets and variables → Actions → New repository secret`
+3. Name: `NPM_TOKEN`, value: the token

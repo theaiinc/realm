@@ -1,0 +1,56 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - name: Derive package directory from tag
+        id: pkg
+        run: |
+          # Tag format: {name}-v{version}  e.g. core-v0.2.0, api-v0.2.0
+          NAME="${GITHUB_REF_NAME%-v*}"
+          case "$NAME" in
+            api)       DIR="realm-api" ;;
+            browser)   DIR="realm-browser" ;;
+            cli)       DIR="realm-cli" ;;
+            container) DIR="realm-container" ;;
+            core)      DIR="realm-core" ;;
+            ubuntu)    DIR="realm-ubuntu" ;;
+            veil)      DIR="realm-veil" ;;
+            *)
+              echo "::error::Unknown package prefix '$NAME' in tag $GITHUB_REF_NAME"
+              exit 1
+              ;;
+          esac
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Publish ${{ steps.pkg.outputs.dir }}
+        run: pnpm publish --filter ./packages/${{ steps.pkg.outputs.dir }} --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
