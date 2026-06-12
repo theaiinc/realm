@@ -51,22 +51,32 @@ jobs:
         env:
           PKG_DIR: ${{ steps.pkg.outputs.dir }}
         run: |
-          # Get package name from package.json
           PKG_NAME=$(node -p "require('./packages/$PKG_DIR/package.json').name")
-          echo "Publishing $PKG_NAME from packages/$PKG_DIR"
+          PKG_ENC=$(node -p "encodeURIComponent('$PKG_NAME')")
+          echo "Publishing $PKG_NAME (encoded: $PKG_ENC)"
 
-          # 1. Get GitHub OIDC id_token
+          echo "=== Step 1: Get GitHub OIDC id_token ==="
           JWT=$(curl -sSL \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
             | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).value")
+          echo "JWT length: ${#JWT}"
 
-          # 2. Exchange for a short-lived npm token (scoped to this package)
-          NPM_TOKEN=$(curl -sS -X POST \
-            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$(node -p "encodeURIComponent('$PKG_NAME')")" \
-            -H "Authorization: Bearer $JWT" \
-            | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).token")
+          echo "=== Step 2: Exchange with npm ==="
+          HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/exchange-result.json \
+            -X POST \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$PKG_ENC" \
+            -H "Authorization: Bearer $JWT")
+          echo "Exchange HTTP code: $HTTP_CODE"
+          echo "Response: $(cat /tmp/exchange-result.json)"
 
-          # 3. pnpm reads NPM_TOKEN env var for auth
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "::error::OIDC token exchange failed"
+            exit 1
+          fi
+
+          NPM_TOKEN=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/exchange-result.json','utf8')).token")
+          echo "Token obtained: ${#NPM_TOKEN} chars"
+
           export NPM_TOKEN
           pnpm publish --filter "./packages/$PKG_DIR" --no-git-checks
