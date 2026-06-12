@@ -8,8 +8,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write  # Required for OIDC trusted publishing
       contents: read
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -22,9 +22,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
-          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -51,6 +50,4 @@ jobs:
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
 
       - name: Publish ${{ steps.pkg.outputs.dir }}
-        run: pnpm publish --filter ./packages/${{ steps.pkg.outputs.dir }} --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --filter ./packages/${{ steps.pkg.outputs.dir }}
