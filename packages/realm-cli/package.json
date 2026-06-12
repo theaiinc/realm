@@ -2,12 +2,21 @@
   "name": "@theaiinc/realm-cli",
   "version": "0.1.1",
   "description": "CLI client for managing Realm execution environments — create, start, stop, exec, and destroy sandboxed realms",
-  "keywords": ["realm", "cli", "sandbox", "ai-agent", "execution-environment", "devtools"],
+  "keywords": [
+    "realm",
+    "cli",
+    "sandbox",
+    "ai-agent",
+    "execution-environment",
+    "devtools"
+  ],
   "type": "module",
   "bin": {
-    "realm": "./dist/cli.js"
+    "realm": "dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup src/cli.ts --format esm --clean",
     "test": "vitest run",
