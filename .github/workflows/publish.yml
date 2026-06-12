@@ -7,12 +7,13 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       id-token: write  # Required for OIDC trusted publishing
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.release.target_commitish }}
 
@@ -20,9 +21,9 @@ jobs:
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: '24'
 
       - run: pnpm install --frozen-lockfile
 
