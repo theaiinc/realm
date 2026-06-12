@@ -1,6 +1,6 @@
 {
   "name": "@theaiinc/realm-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Core abstractions, types, and API facade for the Realm platform — the universal interface for isolated AI execution environments",
   "keywords": ["realm", "ai", "agent", "sandbox", "isolation", "execution-environment"],
   "type": "module",
@@ -33,5 +33,9 @@
     "type": "git",
     "url": "git+https://github.com/theaiinc/realm.git",
     "directory": "packages/realm-core"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-core/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
   }
 }

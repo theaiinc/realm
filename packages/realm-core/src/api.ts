@@ -1,3 +1,4 @@
+import { checkCapability } from './enforcer.js';
 import type { RealmEngine } from './engine.js';
 import type {
   RealmConfig,
@@ -6,6 +7,9 @@ import type {
   FileRef,
   EngineType,
   AuditEntry,
+  SessionCapability,
+  Operation,
+  PermissionEvent,
 } from './types.js';
 
 /**
@@ -62,10 +66,16 @@ export class EngineNotSupportedError extends RealmError {
  *
  * Routes calls to the correct engine based on the realm's configuration.
  * Handles cross-cutting concerns: audit logging, permission checks, Veil integration.
+ *
+ * Enforcement model:
+ *   Session owns granted capabilities (set at session creation).
+ *   PermissionManager checks operations against granted capabilities.
+ *   Engines are capability-naive — they never know permissions exist.
  */
 export class RealmAPI {
   private readonly engines = new Map<EngineType, RealmEngine>();
   private readonly realms = new Map<string, { realm: RealmConfig; session?: RealmSession }>();
+  private readonly permissionEvents: PermissionEvent[] = [];
 
   constructor(private readonly auditLogger: AuditLogger) {}
 
@@ -111,8 +121,14 @@ export class RealmAPI {
     return realmId;
   }
 
-  /** Start a realm session */
-  async start(realmId: string): Promise<RealmSession> {
+  /**
+   * Start a realm session with granted capabilities.
+   *
+   * @param realmId - The realm to start
+   * @param capabilities - Capabilities granted to this session (e.g. ['observe', 'mouse'])
+   *                       Defaults to all capabilities if not provided.
+   */
+  async start(realmId: string, capabilities?: SessionCapability[]): Promise<RealmSession> {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
 
@@ -120,11 +136,13 @@ export class RealmAPI {
     if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
 
     const session = await engine.start(realmId);
+    // Override the engine's empty grantedCapabilities with the caller-supplied set
+    session.grantedCapabilities = capabilities ?? ['observe', 'mouse', 'keyboard', 'scroll', 'drag', 'clipboard'];
     entry.session = session;
 
     await this.auditLogger.log({
       action: 'realm.start',
-      detail: `Started realm: ${realmId}`,
+      detail: `Started realm: ${realmId} with capabilities: ${session.grantedCapabilities.join(', ')}`,
       success: true,
     });
 
@@ -209,6 +227,8 @@ export class RealmAPI {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
 
+    this.enforceCapability(entry.session, 'capture', realmId);
+
     const engine = this.engines.get(entry.realm.engine);
     if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
 
@@ -227,6 +247,8 @@ export class RealmAPI {
   async click(realmId: string, x: number, y: number): Promise<ActionResult> {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
+
+    this.enforceCapability(entry.session, 'click', realmId);
 
     const engine = this.engines.get(entry.realm.engine);
     if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
@@ -247,6 +269,8 @@ export class RealmAPI {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
 
+    this.enforceCapability(entry.session, 'click', realmId); // navigate requires same capability as click
+
     const engine = this.engines.get(entry.realm.engine);
     if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
 
@@ -266,6 +290,8 @@ export class RealmAPI {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
 
+    this.enforceCapability(entry.session, 'type', realmId);
+
     const engine = this.engines.get(entry.realm.engine);
     if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
 
@@ -274,6 +300,48 @@ export class RealmAPI {
     await this.auditLogger.log({
       action: 'realm.type',
       detail: `Typed ${text.length} chars in realm: ${realmId}`,
+      success: result.success,
+    });
+
+    return result;
+  }
+
+  /** Press a keyboard key */
+  async keyPress(realmId: string, key: string): Promise<ActionResult> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    this.enforceCapability(entry.session, 'keyPress', realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+
+    const result = await engine.keyPress(realmId, key);
+
+    await this.auditLogger.log({
+      action: 'realm.keyPress',
+      detail: `Key press: ${key} in realm: ${realmId}`,
+      success: result.success,
+    });
+
+    return result;
+  }
+
+  /** Scroll the viewport */
+  async scroll(realmId: string, deltaX: number, deltaY: number): Promise<ActionResult> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    this.enforceCapability(entry.session, 'scroll', realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+
+    const result = await engine.scroll(realmId, deltaX, deltaY);
+
+    await this.auditLogger.log({
+      action: 'realm.scroll',
+      detail: `Scroll (${deltaX}, ${deltaY}) in realm: ${realmId}`,
       success: result.success,
     });
 
@@ -356,6 +424,38 @@ export class RealmAPI {
   /** Get the audit trail */
   getAuditLog(): AuditEntry[] {
     return this.auditLogger.getEntries();
+  }
+
+  /** Get structured permission events (denials with full context) */
+  getPermissionEvents(): PermissionEvent[] {
+    return [...this.permissionEvents];
+  }
+
+  /**
+   * Enforce capability check for the given operation.
+   * Throws PermissionDeniedError if the session does not have the required capability.
+   * Logs a structured PermissionEvent on denial for auditing and Veil integration.
+   */
+  private enforceCapability(session: RealmSession | undefined, operation: Operation, realmId?: string): void {
+    const result = checkCapability(session, operation);
+    if (!result.allowed) {
+      const event: PermissionEvent = {
+        sessionId: session?.id ?? 'unknown',
+        realmId: realmId ?? session?.realmId ?? 'unknown',
+        operation,
+        allowed: false,
+        reason: result.reason ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      };
+      this.auditLogger.log({
+        action: 'permission.denied',
+        detail: `Permission denied: ${event.reason} (operation: ${event.operation}, session: ${event.sessionId})`,
+        success: false,
+      });
+      // Store structured event for querying
+      this.permissionEvents.push(event);
+      throw new PermissionDeniedError(result.reason ?? 'unknown');
+    }
   }
 }
 

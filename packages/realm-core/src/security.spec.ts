@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { PermissionManager, type PermissionRequest } from './security.js';
+import { describe, it, expect } from 'vitest';
+import { PermissionManager } from './security.js';
 import { PermissionType } from './types.js';
 
 describe('PermissionManager', () => {
@@ -67,12 +67,6 @@ describe('PermissionManager', () => {
     pm.revokeAll('realm-1');
 
     // All should require re-approval
-    let callCount = 0;
-    const pm2 = new PermissionManager(async () => {
-      callCount++;
-      return true;
-    });
-    // ... just verify revokeAll doesn't throw
     pm.revokeAll('realm-2'); // non-existent realm
   });
 });

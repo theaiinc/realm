@@ -74,6 +74,7 @@ export class UbuntuEngine implements RealmEngine {
       realmId,
       state: RealmState.Running,
       startedAt: info.State.StartedAt ?? new Date().toISOString(),
+      grantedCapabilities: [],
     };
   }
 
@@ -92,6 +93,7 @@ export class UbuntuEngine implements RealmEngine {
       realmId,
       state: RealmState.Running,
       startedAt: new Date().toISOString(),
+      grantedCapabilities: [],
     };
   }
 

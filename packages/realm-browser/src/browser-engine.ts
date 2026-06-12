@@ -78,6 +78,7 @@ export class BrowserEngine implements RealmEngine {
       realmId,
       state: RealmState.Running,
       startedAt: state.startedAt,
+      grantedCapabilities: [],
     };
   }
 
@@ -112,6 +113,7 @@ export class BrowserEngine implements RealmEngine {
         realmId,
         state: RealmState.Running,
         startedAt: state.startedAt ?? new Date().toISOString(),
+        grantedCapabilities: [],
       };
     }
 

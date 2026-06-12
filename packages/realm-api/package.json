@@ -1,6 +1,6 @@
 {
   "name": "@theaiinc/realm-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fastify HTTP API server for Realm — exposes realm lifecycle, execution, and audit endpoints over REST",
   "keywords": ["realm", "api", "fastify", "rest", "ai-agent", "orchestration"],
   "type": "module",
@@ -31,5 +31,9 @@
     "type": "git",
     "url": "git+https://github.com/theaiinc/realm.git",
     "directory": "packages/realm-api"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-api/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
   }
 }

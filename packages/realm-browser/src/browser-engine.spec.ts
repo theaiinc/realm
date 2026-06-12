@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserEngine } from './browser-engine.js';
 import type { RealmConfig } from '@theaiinc/realm-core';
-import { EngineType, NetworkMode } from '@theaiinc/realm-core';
+import { EngineType } from '@theaiinc/realm-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 

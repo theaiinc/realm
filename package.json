@@ -1,8 +1,16 @@
 {
   "name": "@theaiinc/realm",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Realm \u2014 isolated AI execution environment platform",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theaiinc/realm.git"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
+  },
   "scripts": {
     "build": "pnpm -r --filter='./packages/*' exec npx tsup src/index.ts --format esm --dts --clean || true && cd packages/realm-api && npx tsup src/server.ts --format esm --clean && cd ../../packages/realm-cli && npx tsup src/cli.ts --format esm --clean",
     "test": "cd packages/realm-core && npx vitest run && cd ../../packages/realm-container && npx vitest run && cd ../../packages/realm-browser && npx vitest run && cd ../../packages/realm-veil && npx vitest run",

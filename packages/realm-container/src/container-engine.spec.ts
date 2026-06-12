@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ContainerEngine } from './container-engine.js';
 import type { RealmConfig } from '@theaiinc/realm-core';
-import { EngineType, NetworkMode } from '@theaiinc/realm-core';
+import { EngineType } from '@theaiinc/realm-core';
 
 vi.mock('dockerode', () => {
   const mockExecStream = {

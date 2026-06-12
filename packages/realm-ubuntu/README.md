@@ -1,5 +1,11 @@
 # @theaiinc/realm-ubuntu
 
+<p align="center">
+  <a href="https://github.com/theaiinc/realm"><img alt="GitHub Repo" src="https://img.shields.io/badge/github-theaiinc%2Frealm-181717?style=flat-square&logo=github"/></a>
+  <a href="https://www.npmjs.com/package/@theaiinc/realm-ubuntu"><img alt="npm" src="https://img.shields.io/npm/v/@theaiinc/realm-ubuntu?style=flat-square&logo=npm"/></a>
+  <a href="https://github.com/theaiinc/realm/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/theaiinc/realm?style=flat-square"/></a>
+</p>
+
 ![Realm](logo.svg)
 
 **Ubuntu Desktop engine for Realm.**
@@ -71,19 +77,15 @@ The Dockerfile builds an image with:
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────┐
-│  realm-ubuntu Container                     │
-│                                             │
-│  Xvfb ── XFCE4 ── x11vnc (:5901)           │
-│    │                                        │
-│    ├── Chromium + Oasis Bridge Extension    │
-│    │        └── WebSocket ── host:8008      │
-│    │                                        │
-│    └── Ratatoskr                            │
-│             └── HTTP ── host.docker:3000    │
-│                                             │
-└─────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Container[realm-ubuntu Container]
+        XVFB[Xvfb] --> XFCE[XFCE4] --> VNC[x11vnc :5901]
+        XFCE --> CHROMIUM[Chromium + Oasis Bridge Extension]
+        CHROMIUM --> WS[WebSocket ── host:8008]
+        XFCE --> RAT[Ratatoskr]
+        RAT --> HTTP[HTTP ── host.docker:3000]
+    end
 ```
 
 ## License

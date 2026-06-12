@@ -1,5 +1,11 @@
 # @theaiinc/realm-browser
 
+<p align="center">
+  <a href="https://github.com/theaiinc/realm"><img alt="GitHub Repo" src="https://img.shields.io/badge/github-theaiinc%2Frealm-181717?style=flat-square&logo=github"/></a>
+  <a href="https://www.npmjs.com/package/@theaiinc/realm-browser"><img alt="npm" src="https://img.shields.io/npm/v/@theaiinc/realm-browser?style=flat-square&logo=npm"/></a>
+  <a href="https://github.com/theaiinc/realm/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/theaiinc/realm?style=flat-square"/></a>
+</p>
+
 ![Realm](logo.svg)
 
 **Playwright/Chromium browser engine for Realm.**

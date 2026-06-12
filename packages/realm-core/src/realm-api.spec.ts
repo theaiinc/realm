@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RealmAPI, AuditLogger } from './api.js';
-import { EngineType, NetworkMode, PermissionType } from './types.js';
+import { EngineType, NetworkMode, RealmState } from './types.js';
 import type { RealmEngine } from './engine.js';
 import type { RealmConfig, RealmSession, ActionResult, FileRef } from './types.js';
 
@@ -11,7 +11,7 @@ class MockEngine implements RealmEngine {
 
   async create(config: RealmConfig): Promise<string> {
     const id = `realm-${config.name}-${Date.now()}`;
-    this.realmData.set(id, false); // not started
+    this.realmData.set(id, false);
     return id;
   }
 
@@ -20,8 +20,9 @@ class MockEngine implements RealmEngine {
     return {
       id: `session-${realmId}`,
       realmId,
-      state: 'running' as const,
+      state: RealmState.Running,
       startedAt: new Date().toISOString(),
+      grantedCapabilities: [],
     };
   }
 
@@ -29,7 +30,7 @@ class MockEngine implements RealmEngine {
     this.realmData.set(realmId, false);
   }
 
-  async pause(realmId: string): Promise<void> {
+  async pause(_realmId: string): Promise<void> {
     // no-op
   }
 
@@ -37,8 +38,9 @@ class MockEngine implements RealmEngine {
     return {
       id: `session-${realmId}`,
       realmId,
-      state: 'running' as const,
+      state: RealmState.Running,
       startedAt: new Date().toISOString(),
+      grantedCapabilities: [],
     };
   }
 
@@ -174,6 +176,7 @@ describe('RealmAPI', () => {
 
     beforeEach(async () => {
       realmId = await api.create({ name: 'action-test', engine: EngineType.Container });
+      await api.start(realmId, ['observe', 'mouse', 'keyboard']);
     });
 
     it('should capture a screenshot', async () => {
@@ -202,7 +205,7 @@ describe('RealmAPI', () => {
   describe('audit logging', () => {
     it('should log all actions', async () => {
       const id = await api.create({ name: 'audit-test', engine: EngineType.Container });
-      await api.start(id);
+      await api.start(id, ['observe', 'mouse', 'keyboard']);
       await api.click(id, 10, 20);
       await api.type(id, 'test');
       await api.stop(id);

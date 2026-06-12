@@ -44,6 +44,56 @@ export enum PermissionType {
   SharedFolder = 'shared_folder',
 }
 
+/**
+ * Session capabilities — granted at session creation, enforced by PermissionManager.
+ * Mirrors the Yggdrasil SessionCapability type for cross-system compatibility.
+ */
+export type SessionCapability = 'observe' | 'mouse' | 'keyboard' | 'touch' | 'scroll' | 'drag' | 'clipboard' | 'audio' | 'camera';
+
+/**
+ * Realm operations that require capability enforcement.
+ * Each operation maps to exactly one required capability.
+ */
+export type Operation = 'capture' | 'click' | 'type' | 'scroll' | 'keyPress' | 'drag' | 'clipboard' | 'microphone' | 'camera';
+
+/**
+ * Mapping from operation to the capability required.
+ * Centralized — controllers and routes never check capabilities directly.
+ */
+export const OPERATION_CAPABILITIES: Record<Operation, SessionCapability> = {
+  capture: 'observe',
+  click: 'mouse',
+  type: 'keyboard',
+  scroll: 'scroll',
+  keyPress: 'keyboard',
+  drag: 'drag',
+  clipboard: 'clipboard',
+  microphone: 'audio',
+  camera: 'camera',
+};
+
+/**
+ * Result of a permission check.
+ * The `reason` field enables logging, audits, and future Veil integration.
+ */
+export interface PermissionResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+/**
+ * A permission event recorded when a capability check is denied.
+ * This provides structured data for Veil, compliance, debugging, and security reviews.
+ */
+export interface PermissionEvent {
+  sessionId: string;
+  realmId: string;
+  operation: Operation;
+  allowed: boolean;
+  reason: string;
+  timestamp: string;
+}
+
 /** Template identifiers */
 export enum TemplateType {
   Coding = 'coding',
@@ -98,6 +148,8 @@ export interface RealmSession {
   startedAt: string;
   stoppedAt?: string;
   metadata?: Record<string, string>;
+  /** Capabilities granted at session creation. PermissionManager enforces these. */
+  grantedCapabilities: SessionCapability[];
 }
 
 /** A Realm model — the persistent configuration */

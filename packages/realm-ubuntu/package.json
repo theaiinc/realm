@@ -1,6 +1,6 @@
 {
   "name": "@theaiinc/realm-ubuntu",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ubuntu Desktop engine for Realm — provides a full XFCE4 desktop environment in Docker with VNC, Chromium, and embedded Yggdrasil Ratatoskr for AI agent computer-use tasks",
   "keywords": ["realm", "ubuntu", "desktop", "docker", "xfce", "vnc", "ratatoskr", "yggdrasil", "ai-agent", "computer-use"],
   "type": "module",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@theaiinc/realm-core": "workspace:*",
-    "@theaiinc/yggdrasil-ratatoskr": "^0.2.0",
+    "@theaiinc/yggdrasil-ratatoskr": "^0.3.0",
     "dockerode": "^4.0.0"
   },
   "devDependencies": {
@@ -40,5 +40,9 @@
     "type": "git",
     "url": "git+https://github.com/theaiinc/realm.git",
     "directory": "packages/realm-ubuntu"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-ubuntu/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
   }
 }

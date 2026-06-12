@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { RealmAPI, AuditLogger } from '@theaiinc/realm-core';
-import type { RealmConfig } from '@theaiinc/realm-core';
+import { RealmAPI, AuditLogger, PermissionDeniedError, RealmRegistrationClient } from '@theaiinc/realm-core';
+import type { RealmConfig, SessionCapability, RealmRegistrationClientConfig } from '@theaiinc/realm-core';
 import { ContainerEngine } from '@theaiinc/realm-container';
 import { BrowserEngine } from '@theaiinc/realm-browser';
 import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
@@ -10,6 +10,8 @@ import { VeilPipeline } from '@theaiinc/realm-veil';
 interface RealmServerOptions {
   port?: number;
   host?: string;
+  /** Registration config for announcing this realm to Yggdrasil via Ratatoskr. */
+  registration?: RealmRegistrationClientConfig;
 }
 
 export async function createServer(options?: RealmServerOptions) {
@@ -64,12 +66,21 @@ export async function createServer(options?: RealmServerOptions) {
     }
   });
 
-  // Start realm
-  app.post<{ Params: { id: string } }>('/api/v1/realms/:id/start', async (request, reply) => {
+  // Start realm (accepts optional capabilities)
+  app.post<{
+    Params: { id: string };
+    Body: { capabilities?: SessionCapability[] };
+  }>('/api/v1/realms/:id/start', async (request, reply) => {
     try {
-      const session = await api.start(request.params.id);
+      const session = await api.start(request.params.id, request.body.capabilities);
       return { session };
     } catch (error) {
+      if (error instanceof PermissionDeniedError) {
+        return reply.status(403).send({
+          error: error.message,
+          code: error.code,
+        });
+      }
       return reply.status(400).send({
         error: error instanceof Error ? error.message : String(error),
       });
@@ -110,6 +121,12 @@ export async function createServer(options?: RealmServerOptions) {
         piiRedacted: redacted.cleaned,
       });
     } catch (error) {
+      if (error instanceof PermissionDeniedError) {
+        return reply.status(403).send({
+          error: error.message,
+          code: error.code,
+        });
+      }
       return reply.status(400).send({
         error: error instanceof Error ? error.message : String(error),
       });
@@ -124,6 +141,12 @@ export async function createServer(options?: RealmServerOptions) {
         const result = await api.click(request.params.id, request.body.x, request.body.y);
         return result;
       } catch (error) {
+        if (error instanceof PermissionDeniedError) {
+          return reply.status(403).send({
+            error: error.message,
+            code: error.code,
+          });
+        }
         return reply.status(400).send({
           error: error instanceof Error ? error.message : String(error),
         });
@@ -139,6 +162,12 @@ export async function createServer(options?: RealmServerOptions) {
         const result = await api.navigate(request.params.id, request.body.url);
         return result;
       } catch (error) {
+        if (error instanceof PermissionDeniedError) {
+          return reply.status(403).send({
+            error: error.message,
+            code: error.code,
+          });
+        }
         return reply.status(400).send({
           error: error instanceof Error ? error.message : String(error),
         });
@@ -154,6 +183,54 @@ export async function createServer(options?: RealmServerOptions) {
         const result = await api.type(request.params.id, request.body.text);
         return result;
       } catch (error) {
+        if (error instanceof PermissionDeniedError) {
+          return reply.status(403).send({
+            error: error.message,
+            code: error.code,
+          });
+        }
+        return reply.status(400).send({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Key press
+  app.post<{ Params: { id: string }; Body: { key: string } }>(
+    '/api/v1/realms/:id/keyPress',
+    async (request, reply) => {
+      try {
+        const result = await api.keyPress(request.params.id, request.body.key);
+        return result;
+      } catch (error) {
+        if (error instanceof PermissionDeniedError) {
+          return reply.status(403).send({
+            error: error.message,
+            code: error.code,
+          });
+        }
+        return reply.status(400).send({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Scroll
+  app.post<{ Params: { id: string }; Body: { deltaX: number; deltaY: number } }>(
+    '/api/v1/realms/:id/scroll',
+    async (request, reply) => {
+      try {
+        const result = await api.scroll(request.params.id, request.body.deltaX, request.body.deltaY);
+        return result;
+      } catch (error) {
+        if (error instanceof PermissionDeniedError) {
+          return reply.status(403).send({
+            error: error.message,
+            code: error.code,
+          });
+        }
         return reply.status(400).send({
           error: error instanceof Error ? error.message : String(error),
         });
@@ -221,7 +298,54 @@ export async function createServer(options?: RealmServerOptions) {
   const address = await app.listen({ port, host });
   app.log.info(`Realm API server listening on ${address}`);
 
-  return { app, api, auditLogger, veil };
+  // ── Registration with Yggdrasil (via Ratatoskr) ──────────────────
+  let registrationClient: RealmRegistrationClient | undefined;
+
+  if (options?.registration) {
+    registrationClient = new RealmRegistrationClient(options.registration);
+    await registrationClient.start();
+    app.log.info(
+      `Realm registered with Yggdrasil via Ratatoskr at ${options.registration.ratatoskrUrl}`,
+    );
+  } else {
+    // Fallback: try environment variables
+    const ratatoskrUrl = process.env['RATATOSKR_URL'];
+    const realmId = process.env['REALM_ID'];
+    const runnerId = process.env['RUNNER_ID'];
+    const realmBaseUrl = process.env['REALM_BASE_URL'];
+
+    if (ratatoskrUrl && realmId && runnerId && realmBaseUrl) {
+      registrationClient = new RealmRegistrationClient({
+        realmId,
+        runnerId,
+        ratatoskrUrl,
+        template: process.env['REALM_TEMPLATE'] ?? 'ubuntu',
+        realmBaseUrl,
+        version: process.env['REALM_VERSION'] ?? '0.1.0',
+        capabilities: (process.env['REALM_CAPABILITIES'] ?? '').split(',').filter(Boolean),
+        registrationToken: process.env['REALM_REGISTRATION_TOKEN'],
+        heartbeatIntervalMs: parseInt(process.env['REALM_HEARTBEAT_INTERVAL_MS'] ?? '30000', 10),
+      });
+      await registrationClient.start();
+      app.log.info(`Realm registered with Yggdrasil via Ratatoskr at ${ratatoskrUrl}`);
+    } else {
+      app.log.warn('No registration config provided — realm will not announce itself to Yggdrasil');
+    }
+  }
+
+  // ── Graceful shutdown ─────────────────────────────────────────────
+  const shutdown = async () => {
+    app.log.info('Shutting down...');
+    if (registrationClient) {
+      await registrationClient.stop();
+    }
+    await app.close();
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+
+  return { app, api, auditLogger, veil, registrationClient };
 }
 
 // Run directly

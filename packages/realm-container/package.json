@@ -1,6 +1,6 @@
 {
   "name": "@theaiinc/realm-container",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Docker-based container engine for Realm — provides isolated Linux sandboxes with filesystem, network, and lifecycle management",
   "keywords": ["realm", "docker", "container", "sandbox", "ai-agent", "execution-environment"],
   "type": "module",
@@ -38,5 +38,9 @@
     "type": "git",
     "url": "git+https://github.com/theaiinc/realm.git",
     "directory": "packages/realm-container"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-container/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
   }
 }

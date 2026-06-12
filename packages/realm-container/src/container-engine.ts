@@ -52,6 +52,7 @@ export class ContainerEngine implements RealmEngine {
       realmId,
       state: RealmState.Running,
       startedAt: info.State.StartedAt ?? new Date().toISOString(),
+      grantedCapabilities: [],
     };
   }
 
@@ -70,6 +71,7 @@ export class ContainerEngine implements RealmEngine {
       realmId,
       state: RealmState.Running,
       startedAt: new Date().toISOString(),
+      grantedCapabilities: [],
     };
   }
 
