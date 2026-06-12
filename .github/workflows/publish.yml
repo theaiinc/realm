@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      id-token: write  # Required for OIDC trusted publishing
+      id-token: write
       contents: read
 
     steps:
@@ -26,13 +26,11 @@ jobs:
           node-version: '24'
 
       - run: pnpm install --frozen-lockfile
-
       - run: pnpm build
 
       - name: Derive package directory from tag
         id: pkg
         run: |
-          # Tag format: {name}-v{version}  e.g. core-v0.2.0, api-v0.2.0
           NAME="${GITHUB_REF_NAME%-v*}"
           case "$NAME" in
             api)       DIR="realm-api" ;;
@@ -49,5 +47,26 @@ jobs:
           esac
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Publish ${{ steps.pkg.outputs.dir }}
-        run: pnpm publish --filter ./packages/${{ steps.pkg.outputs.dir }}
+      - name: Exchange OIDC token and publish
+        env:
+          PKG_DIR: ${{ steps.pkg.outputs.dir }}
+        run: |
+          # Get package name from package.json
+          PKG_NAME=$(node -p "require('./packages/$PKG_DIR/package.json').name")
+          echo "Publishing $PKG_NAME from packages/$PKG_DIR"
+
+          # 1. Get GitHub OIDC id_token
+          JWT=$(curl -sSL \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).value")
+
+          # 2. Exchange for a short-lived npm token (scoped to this package)
+          NPM_TOKEN=$(curl -sS -X POST \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$(node -p "encodeURIComponent('$PKG_NAME')")" \
+            -H "Authorization: Bearer $JWT" \
+            | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).token")
+
+          # 3. pnpm reads NPM_TOKEN env var for auth
+          export NPM_TOKEN
+          pnpm publish --filter "./packages/$PKG_DIR" --no-git-checks
