@@ -10,6 +10,15 @@ export enum EngineType {
   Browser = 'browser',
   VM = 'vm',
   Ubuntu = 'ubuntu',
+  /**
+   * Host — a narrow, allowlisted launcher for specific host-native binaries
+   * (see packages/realm-host). This is a deliberate, scoped exception to
+   * this project's "agent never works directly on the host machine"
+   * principle (docs/product-design.prd), not a general escape hatch — it
+   * can only start/stop/inspect a hardcoded allowlist of targets, with no
+   * arbitrary execute().
+   */
+  Host = 'host',
 }
 
 /** Network access levels */

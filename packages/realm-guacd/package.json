@@ -1,0 +1,20 @@
+{
+  "name": "@theaiinc/realm-guacd",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Custom guacd (Apache Guacamole proxy daemon) build for Realm — RDP/SSH only, VNC support excluded so GPL-licensed libvncserver is never compiled in",
+  "keywords": ["realm", "guacd", "guacamole", "rdp", "docker"],
+  "scripts": {
+    "build:docker": "docker build -t realm-guacd -f Dockerfile ."
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theaiinc/realm.git",
+    "directory": "packages/realm-guacd"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-guacd/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
+  }
+}

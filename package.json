@@ -15,10 +15,17 @@
     "build": "pnpm -r --filter='./packages/*' exec npx tsup src/index.ts --format esm --dts --clean || true && cd packages/realm-api && npx tsup src/server.ts --format esm --clean && cd ../../packages/realm-cli && npx tsup src/cli.ts --format esm --clean",
     "test": "cd packages/realm-core && npx vitest run && cd ../../packages/realm-container && npx vitest run && cd ../../packages/realm-browser && npx vitest run && cd ../../packages/realm-veil && npx vitest run",
     "realm": "node packages/realm-cli/dist/cli.js",
-    "realm:api": "node packages/realm-api/dist/server.js"
+    "realm:api": "node packages/realm-api/dist/server.js",
+    "realm:stream": "node packages/realm-client/dist/serve.js",
+    "realm:ui": "pnpm --filter @theaiinc/realm-ui dev"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

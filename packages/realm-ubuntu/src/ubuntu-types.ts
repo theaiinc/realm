@@ -6,6 +6,8 @@ export interface UbuntuOptions {
   depth?: number;
   /** VNC port on host (default: 5901) */
   vncPort?: number;
+  /** RDP port on host (default: 3389) */
+  rdpPort?: number;
   /** Container memory limit in MB (default: 2048) */
   memoryMb?: number;
   /** CPU count (default: 2) */

@@ -1,0 +1,17 @@
+# Brings up only the guacd sidecar (packages/realm-guacd). realm-ubuntu
+# containers stay dynamically created by realm-api via dockerode, as today —
+# guacd (itself a container on Docker Desktop) reaches a given realm over
+# host.docker.internal:<published rdpPort>, so no shared Docker network or
+# container-IP lookup is needed here. realm-api/realm-client/realm-ui all run
+# as plain Node/Vite processes on the host, same as realm-api already does.
+services:
+  guacd:
+    image: realm-guacd
+    build:
+      context: ./packages/realm-guacd
+      dockerfile: Dockerfile
+    ports:
+      - '4822:4822'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped

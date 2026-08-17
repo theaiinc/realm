@@ -1,0 +1,45 @@
+{
+  "name": "@theaiinc/realm-host",
+  "version": "0.1.0",
+  "description": "Narrow, allowlisted host-process launcher for Realm — a deliberate exception to \"agent never works directly on the host machine\", scoped to specific binaries only (initially: Android Emulator + Desktop Head Unit)",
+  "keywords": ["realm", "host", "android-auto", "desktop-head-unit"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@theaiinc/realm-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theaiinc/realm.git",
+    "directory": "packages/realm-host"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-host/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
+  }
+}

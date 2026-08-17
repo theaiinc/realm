@@ -49,7 +49,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11-xserver-utils \
     imagemagick \
     dbus-x11 \
+    xrdp \
     && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------
+# xrdp — bridges RDP to the x11vnc server started by start-realm.sh
+# (see assets/xrdp.ini: a static libvnc.so connector to 127.0.0.1:5901,
+# not a separate Xorg/sesman-spawned session)
+# ------------------------------------------------------------------
+COPY assets/xrdp.ini /etc/xrdp/xrdp.ini
 
 # ------------------------------------------------------------------
 # Browsers
@@ -76,7 +84,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 RUN npm install -g playwright-core && \
     npx playwright install-deps chromium 2>&1 && \
     npx playwright install chromium 2>&1 && \
-    CHROME_PATH=$(ls -d /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome 2>/dev/null | head -1) && \
+    CHROME_PATH=$(find /root/.cache/ms-playwright -type f -name chrome -path '*chromium-*' 2>/dev/null | head -1) && \
     ln -sf "$CHROME_PATH" /usr/bin/chromium-browser && \
     ln -sf "$CHROME_PATH" /usr/bin/google-chrome
 

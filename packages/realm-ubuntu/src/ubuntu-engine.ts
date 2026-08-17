@@ -19,7 +19,7 @@ import type { UbuntuOptions, YggdrasilConfig } from './ubuntu-types.js';
  * Pass YGGDRASIL_URL in config.environment to enable the Ratatoskr daemon.
  */
 export class UbuntuEngine implements RealmEngine {
-  readonly type = EngineType.VM;
+  readonly type = EngineType.Ubuntu;
 
   private readonly docker: Docker;
   private readonly manager: UbuntuManager;
@@ -39,6 +39,7 @@ export class UbuntuEngine implements RealmEngine {
     const ubuntuOpts: UbuntuOptions & { yggdrasil?: YggdrasilConfig } = {
       resolution: config.environment?.['RESOLUTION'] ?? '1920x1080',
       vncPort: config.environment?.['VNC_PORT'] ? parseInt(config.environment['VNC_PORT'], 10) : 5901,
+      rdpPort: config.environment?.['RDP_PORT'] ? parseInt(config.environment['RDP_PORT'], 10) : 3389,
       memoryMb: config.storageLimitMb ?? 2048,
     };
 
@@ -69,12 +70,22 @@ export class UbuntuEngine implements RealmEngine {
     await container.start();
     const info = await container.inspect();
 
+    // Host ports are dynamically assigned (see ubuntu-manager.ts) so
+    // multiple realm-ubuntu realms can run concurrently — callers that
+    // need to reach VNC/RDP externally (e.g. a guacd resolver) read the
+    // actual assigned ports from here rather than assuming a fixed value.
+    const publishedPorts = await this.manager.getPublishedPorts(realmId);
+    const metadata: Record<string, string> = {};
+    if (publishedPorts.vncPort) metadata['vncPort'] = String(publishedPorts.vncPort);
+    if (publishedPorts.rdpPort) metadata['rdpPort'] = String(publishedPorts.rdpPort);
+
     return {
       id: `session-ubuntu-${realmId}`,
       realmId,
       state: RealmState.Running,
       startedAt: info.State.StartedAt ?? new Date().toISOString(),
       grantedCapabilities: [],
+      metadata,
     };
   }
 

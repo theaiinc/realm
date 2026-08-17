@@ -19,6 +19,7 @@ export class UbuntuManager {
     const image = DEFAULT_IMAGE;
     const resolution = options?.resolution ?? '1920x1080';
     const vncPort = options?.vncPort ?? 5901;
+    const rdpPort = options?.rdpPort ?? 3389;
     const memoryMb = options?.memoryMb ?? 2048;
     const cpus = options?.cpus ?? 2;
 
@@ -36,6 +37,7 @@ export class UbuntuManager {
       `DISPLAY=:99`,
       `RESOLUTION=${resolution}`,
       `VNC_PORT=${vncPort}`,
+      `RDP_PORT=${rdpPort}`,
       `DEBIAN_FRONTEND=noninteractive`,
     ];
 
@@ -62,8 +64,18 @@ export class UbuntuManager {
       Env: env,
       HostConfig: {
         NetworkMode: 'bridge',
+        // HostPort: '' lets Docker assign any free ephemeral host port,
+        // rather than pinning to the container-internal port number —
+        // pinning meant a second concurrently running realm-ubuntu
+        // container would fail to start (host port already bound by the
+        // first). The container-internal port (vncPort/rdpPort) stays
+        // fixed since each container has its own network namespace and
+        // nothing outside it needs to agree on that number; only the
+        // host-side binding needs to vary per-realm. Callers read the
+        // actual assigned host ports via getPublishedPorts() after start.
         PortBindings: {
-          [`${vncPort}/tcp`]: [{ HostPort: String(vncPort) }],
+          [`${vncPort}/tcp`]: [{ HostPort: '' }],
+          [`${rdpPort}/tcp`]: [{ HostPort: '' }],
         },
         Memory: memoryMb * 1024 * 1024,
         MemorySwap: 0,
@@ -75,6 +87,7 @@ export class UbuntuManager {
       WorkingDir: '/workspace',
       ExposedPorts: {
         [`${vncPort}/tcp`]: {},
+        [`${rdpPort}/tcp`]: {},
       },
     });
 
@@ -84,6 +97,30 @@ export class UbuntuManager {
   async startContainer(containerId: string): Promise<void> {
     const container = this.docker.getContainer(containerId);
     await container.start();
+  }
+
+  /**
+   * Reads back the host ports Docker actually assigned for VNC/RDP
+   * (see the HostPort: '' comment in createContainer) — only meaningful
+   * after the container has started, since bindings aren't live until then.
+   */
+  async getPublishedPorts(containerId: string): Promise<{ vncPort?: number; rdpPort?: number }> {
+    const container = this.docker.getContainer(containerId);
+    const info = await container.inspect();
+    const ports = info.NetworkSettings?.Ports ?? {};
+
+    const hostPortFor = (containerPortKey: string): number | undefined => {
+      const binding = ports[containerPortKey]?.[0]?.HostPort;
+      return binding ? parseInt(binding, 10) : undefined;
+    };
+
+    const vncEnv = info.Config?.Env?.find((e) => e.startsWith('VNC_PORT='))?.split('=')[1];
+    const rdpEnv = info.Config?.Env?.find((e) => e.startsWith('RDP_PORT='))?.split('=')[1];
+
+    return {
+      vncPort: vncEnv ? hostPortFor(`${vncEnv}/tcp`) : undefined,
+      rdpPort: rdpEnv ? hostPortFor(`${rdpEnv}/tcp`) : undefined,
+    };
   }
 
   async stopContainer(containerId: string): Promise<void> {

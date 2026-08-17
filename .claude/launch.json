@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "realm-ui",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@theaiinc/realm-ui", "dev"],
+      "port": 5799,
+      "autoPort": false
+    }
+  ]
+}

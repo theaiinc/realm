@@ -5,6 +5,7 @@ import type { RealmConfig, SessionCapability, RealmRegistrationClientConfig } fr
 import { ContainerEngine } from '@theaiinc/realm-container';
 import { BrowserEngine } from '@theaiinc/realm-browser';
 import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
+import { HostEngine } from '@theaiinc/realm-host';
 import { VeilPipeline } from '@theaiinc/realm-veil';
 
 interface RealmServerOptions {
@@ -26,6 +27,15 @@ export async function createServer(options?: RealmServerOptions) {
   api.registerEngine(new ContainerEngine());
   api.registerEngine(new BrowserEngine());
   api.registerEngine(new UbuntuEngine());
+
+  // HostEngine is a deliberate, narrow exception to "agent never works
+  // directly on the host machine" (docs/product-design.prd) — see
+  // packages/realm-host/README.md. Gated behind an explicit opt-in so the
+  // capability isn't silently available on every realm-api instance.
+  if (process.env.ENABLE_HOST_ENGINE === 'true') {
+    api.registerEngine(new HostEngine());
+    console.warn('[realm-api] ENABLE_HOST_ENGINE=true — HostEngine registered (host process access, see packages/realm-host/README.md)');
+  }
 
   const app = Fastify({ logger: true });
 
@@ -244,6 +254,36 @@ export async function createServer(options?: RealmServerOptions) {
     async (request, reply) => {
       try {
         const result = await api.execute(request.params.id, request.body.command);
+        return result;
+      } catch (error) {
+        return reply.status(400).send({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Set location (only realms whose engine supports RealmEngine.setLocation, e.g. realm-host)
+  app.post<{ Params: { id: string }; Body: { latitude: number; longitude: number } }>(
+    '/api/v1/realms/:id/location',
+    async (request, reply) => {
+      try {
+        const result = await api.setLocation(request.params.id, request.body.latitude, request.body.longitude);
+        return result;
+      } catch (error) {
+        return reply.status(400).send({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Install an app (only realms whose engine supports RealmEngine.installApp, e.g. realm-host)
+  app.post<{ Params: { id: string }; Body: { apkPath: string } }>(
+    '/api/v1/realms/:id/install',
+    async (request, reply) => {
+      try {
+        const result = await api.installApp(request.params.id, request.body.apkPath);
         return result;
       } catch (error) {
         return reply.status(400).send({

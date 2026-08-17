@@ -70,4 +70,19 @@ export interface RealmEngine {
 
   /** Health check for the engine instance */
   health(): Promise<{ status: 'healthy' | 'degraded' | 'unhealthy'; uptimeSec: number }>;
+
+  /**
+   * Set mock geolocation for the realm, if the engine supports it (e.g.
+   * realm-host's Android Auto target via `adb emu geo fix`). Optional so
+   * engines without a device-location concept (container, browser) need no
+   * changes — RealmAPI checks for presence before delegating.
+   */
+  setLocation?(realmId: string, latitude: number, longitude: number): Promise<ActionResult>;
+
+  /**
+   * Install an application into the realm from a host-local path, if the
+   * engine supports it (e.g. realm-host via `adb install`). Optional for
+   * the same reason as setLocation.
+   */
+  installApp?(realmId: string, apkPath: string): Promise<ActionResult>;
 }

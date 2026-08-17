@@ -5,19 +5,22 @@
 # 2. Creates .Xauthority for Xlib-based tools (pyautogui, etc.)
 # 3. Launches XFCE4 desktop session
 # 4. Starts x11vnc for remote access
-# 5. Launches Yggdrasil Ratatoskr daemon (if YGGDRASIL_URL is set)
-# 6. Keeps container alive
+# 5. Starts xrdp (bridges RDP to the x11vnc session above)
+# 6. Launches Yggdrasil Ratatoskr daemon (if YGGDRASIL_URL is set)
+# 7. Keeps container alive
 
 set -e
 
 RESOLUTION="${1:-1920x1080}"
 VNC_PORT="${VNC_PORT:-5901}"
+RDP_PORT="${RDP_PORT:-3389}"
 DISPLAY="${DISPLAY:-:99}"
 
 echo "[realm-ubuntu] Starting Ubuntu Desktop realm..."
 echo "  Resolution: $RESOLUTION"
 echo "  Display:    $DISPLAY"
 echo "  VNC port:   $VNC_PORT"
+echo "  RDP port:   $RDP_PORT"
 
 # ------------------------------------------------------------------
 # dbus
@@ -68,6 +71,18 @@ x11vnc -display "$DISPLAY" \
     -bg \
     2>/dev/null || true
 echo "[realm-ubuntu] x11vnc started on port $VNC_PORT"
+
+# ------------------------------------------------------------------
+# xrdp — bridges RDP to the x11vnc session above (see assets/xrdp.ini).
+# Patches the listening port at runtime if RDP_PORT differs from the
+# 3389 baked into the image, same pattern as the Oasis WS_URL patch
+# below.
+# ------------------------------------------------------------------
+sed -i "s|^port=3389|port=${RDP_PORT}|" /etc/xrdp/xrdp.ini
+mkdir -p /var/run/xrdp
+xrdp --nodaemon > /tmp/xrdp.log 2>&1 &
+XRDP_PID=$!
+echo "[realm-ubuntu] xrdp started on port $RDP_PORT (PID: $XRDP_PID)"
 
 # ------------------------------------------------------------------
 # Desktop terminal (backgrounded — can block as CMD)

@@ -5,7 +5,7 @@ import { EngineType } from '@theaiinc/realm-core';
 describe('UbuntuEngine', () => {
   it('has type Ubuntu', () => {
     const engine = new UbuntuEngine();
-    expect(engine.type).toBe(EngineType.VM);
+    expect(engine.type).toBe(EngineType.Ubuntu);
   });
 
   it('health returns degraded when docker is unavailable', async () => {

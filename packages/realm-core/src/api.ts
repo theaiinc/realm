@@ -405,6 +405,50 @@ export class RealmAPI {
     return fileRef;
   }
 
+  /** Set mock geolocation, for engines that support it (see RealmEngine.setLocation) */
+  async setLocation(realmId: string, latitude: number, longitude: number): Promise<ActionResult> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.setLocation) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support setLocation`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.setLocation(realmId, latitude, longitude);
+
+    await this.auditLogger.log({
+      action: 'realm.setLocation',
+      detail: `Set location to (${latitude}, ${longitude}) in realm: ${realmId}`,
+      success: result.success,
+    });
+
+    return result;
+  }
+
+  /** Install an app from a host-local path, for engines that support it (see RealmEngine.installApp) */
+  async installApp(realmId: string, apkPath: string): Promise<ActionResult> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.installApp) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support installApp`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.installApp(realmId, apkPath);
+
+    await this.auditLogger.log({
+      action: 'realm.installApp',
+      detail: `Installed ${apkPath} in realm: ${realmId}`,
+      success: result.success,
+    });
+
+    return result;
+  }
+
   /** List realms */
   listRealms(): Array<{ id: string; config: RealmConfig; session?: RealmSession }> {
     return Array.from(this.realms.entries()).map(([id, entry]) => ({
