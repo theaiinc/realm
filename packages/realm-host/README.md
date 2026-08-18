@@ -32,7 +32,15 @@ await engine.stop(realmId);
 
 `AVD_NAME` defaults to `Pixel_9_Pro` and must already exist (created via `avdmanager`) with the Android Auto app already installed and signed in — this engine only launches it, it doesn't provision it.
 
-Android Auto's "Start head unit server" toggle (app → Developer Settings → overflow menu) is a runtime service start, not a persisted setting — it does not survive an emulator restart, and must be re-done by hand after every fresh boot, before `start()` will succeed. `start()` retries connecting Desktop Head Unit for ~45s to give that manual step room to land; if it still fails, the error tells you exactly what to check.
+Android Auto's "Start head unit server" toggle (app → Developer Settings → overflow menu) is a runtime service start, not a persisted setting — it does not survive an emulator restart. `start()` automates this itself via `uiautomator` (see `targets/android-auto.ts`'s `startHeadUnitServer`), polling for each UI element rather than using fixed delays, so no manual step is needed on a fresh boot. It also automates the notification-listener access grant Android Auto otherwise blocks on. `start()` retries connecting Desktop Head Unit for ~45s after that; if it still fails, the error tells you exactly what to check.
+
+### Device capabilities
+
+Location, app install, and file import/export are dynamic — usable any time after `start()`, via `RealmAPI.setLocation`/`installApp`/`importFile`/`exportFile` (REST: `POST /realms/:id/location`, `/install`, `/import`, `/export`).
+
+Camera and microphone are launch-time only — the emulator reads them once at process start, with no known `adb`-level hot-swap:
+- `environment.CAMERA_BACK` / `CAMERA_FRONT` — passed straight through as `-camera-back`/`-camera-front` (see `emulator -help`; values include `emulated`, `webcam<N>`, `virtualscene`, `none`).
+- `environment.MICROPHONE_HOST_AUDIO=true` — passes `-allow-host-audio`, which routes the Mac's actual selected input device into the guest's virtual mic. Without it, the emulator zeroes out mic input entirely. There's no way to inject a *specific* prerecorded file/PCM stream via this package — see Known limitations.
 
 ## Host dependencies
 
@@ -43,3 +51,4 @@ Android Auto's "Start head unit server" toggle (app → Developer Settings → o
 
 - `capture()` is a full-screen `screencapture`, not a window-specific crop — macOS window-ID resolution via AppleScript/System Events proved unreliable during manual validation. Fine for a secondary view; `realm-ui`'s primary panel is the real-time Guacamole stream of the container desktop.
 - `keyPress` is best-effort via AppleScript `keystroke` — named keys (Return, Tab, Escape, ...) aren't mapped to AppleScript key codes yet, only literal characters.
+- **No file/PCM microphone injection.** The emulator ships a documented gRPC RPC for exactly this (`injectAudio` in `emulator_controller.proto`, launched via `-grpc <port>`), and it looked like the right tool — but it reproducibly **crashed the emulator process itself** (a Mach exception, not a clean RPC error) on two separate spike attempts with materially different request encodings (string vs. numeric enum values, multi-chunk stream vs. a single small packet). Build/host combo where this was confirmed: emulator 35.4.9-13025442, API 36 `Pixel_9_Pro` AVD, macOS/Apple Silicon with HVF acceleration. Shipping that path would trade "mic input isn't scriptable yet" for "the realm can crash outright the first time an agent tries to use it," which is worse than not having the feature. `MICROPHONE_HOST_AUDIO` (host mic passthrough, see above) is the only mic mechanism implemented. Revisit `injectAudio` if a future emulator release fixes the crash.

@@ -253,6 +253,30 @@ export interface LaunchOptions {
    */
   cameraBack?: string;
   cameraFront?: string;
+  /**
+   * Passes `-allow-host-audio`, which routes the Mac's actual selected
+   * input device into the guest's virtual microphone. Without this flag
+   * the emulator's default behavior is to zero out mic input entirely
+   * (per `emulator -help`), so this is required for the mic to carry any
+   * signal at all.
+   *
+   * This is the only mic-related mechanism this module implements. The
+   * emulator also ships a documented gRPC `injectAudio` RPC
+   * (emulator_controller.proto) that looks like it should allow injecting
+   * a specific prerecorded file/PCM stream on demand — that was spiked
+   * and rejected: it reproducibly crashed the emulator process itself
+   * (Mach exception, not a clean RPC error) on two separate attempts with
+   * materially different request encodings, on this host's build
+   * (macOS/Apple Silicon, HVF acceleration, emulator 35.4.9-13025442,
+   * API 36). Shipping that path would trade "mic input isn't automatable
+   * yet" for "the realm can crash outright when an agent tries to use
+   * it," which is a worse failure mode. If a future emulator release
+   * fixes it, this is the place to revisit.
+   *
+   * Like camera, this can't be dynamic — it's a process-launch flag, no
+   * known adb-level hot-swap.
+   */
+  microphoneHostAudio?: boolean;
 }
 
 /**
@@ -283,6 +307,7 @@ export async function launchAndroidAuto(avdName: string, options: LaunchOptions 
   const emulatorArgs = ['-avd', avdName, '-no-snapshot', '-port', String(EMULATOR_CONSOLE_PORT)];
   if (options.cameraBack) emulatorArgs.push('-camera-back', options.cameraBack);
   if (options.cameraFront) emulatorArgs.push('-camera-front', options.cameraFront);
+  if (options.microphoneHostAudio) emulatorArgs.push('-allow-host-audio');
   const emulator = spawn(emulatorBin, emulatorArgs, { stdio: 'ignore' });
 
   await waitForBootCompleted(serial, BOOT_TIMEOUT_MS);

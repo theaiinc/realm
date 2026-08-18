@@ -20,6 +20,10 @@ export interface HostRealmRecord {
   // location/app-install which are genuinely dynamic.
   cameraBack?: string;
   cameraFront?: string;
+  // See LaunchOptions.microphoneHostAudio in targets/android-auto.ts for why
+  // this is a launch-time toggle (host mic passthrough) rather than a
+  // dynamic file-injection API.
+  microphoneHostAudio?: boolean;
   emulatorPid?: number;
   dhuPid?: number;
 }

@@ -73,6 +73,7 @@ export class HostEngine implements RealmEngine {
       avdName: config.environment?.['AVD_NAME'] ?? 'Pixel_9_Pro',
       cameraBack: config.environment?.['CAMERA_BACK'],
       cameraFront: config.environment?.['CAMERA_FRONT'],
+      microphoneHostAudio: config.environment?.['MICROPHONE_HOST_AUDIO'] === 'true',
     });
     return realmId;
   }
@@ -85,7 +86,11 @@ export class HostEngine implements RealmEngine {
     // one is additive rather than a rewrite.
     switch (record.target) {
       case 'android-auto': {
-        const result = await launchAndroidAuto(record.avdName, { cameraBack: record.cameraBack, cameraFront: record.cameraFront });
+        const result = await launchAndroidAuto(record.avdName, {
+          cameraBack: record.cameraBack,
+          cameraFront: record.cameraFront,
+          microphoneHostAudio: record.microphoneHostAudio,
+        });
         this.running.set(realmId, result);
         record.emulatorPid = result.emulator.pid;
         record.dhuPid = result.dhu.pid;
