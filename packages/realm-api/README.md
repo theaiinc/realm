@@ -46,6 +46,21 @@ pnpm add @theaiinc/realm-api
 | POST | `/api/v1/realms/:id/export` | Export file |
 | GET | `/api/v1/audit` | Get audit log |
 
+## Access control
+
+The API can run commands (`/exec`) and read or write files (`/import`, `/export`), so reaching it is the same as holding a shell on the host.
+
+- **Loopback (the default, `REALM_HOST=127.0.0.1`):** no token needed.
+- **Any other `REALM_HOST`:** set `REALM_API_TOKEN` (at least 32 characters). The server refuses to start without it. Every request except `GET /api/v1/health` must send `Authorization: Bearer <token>`.
+
+```bash
+REALM_HOST=0.0.0.0 REALM_API_TOKEN="$(openssl rand -base64 48)" node dist/server.js
+```
+
+## Engines
+
+`REALM_ENGINES` picks which engines register: a comma-separated list of `container`, `browser`, `ubuntu` (default: all three). On a host without a Docker daemon, set `REALM_ENGINES=browser` so the server doesn't advertise engines that can't start. `Dockerfile.api` at the repo root builds that browser-only image, and `packages/realm-cloudflare` runs it on Cloudflare Containers.
+
 ## Quick Start
 
 ```bash
