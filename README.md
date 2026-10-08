@@ -25,6 +25,7 @@ graph TD
     RA --> CE[Container<br/>Docker]
     RA --> BE[Browser<br/>Playwright/Chromium]
     RA --> UE[Ubuntu Desktop<br/>XFCE/VNC]
+    RA --> DS[Docker Sandbox<br/>sbx, cloud or local]
     subgraph CC[Isolation · Security · Audit · Veil PII]
         direction LR
         I[Isolation] --> S[Security]
@@ -34,6 +35,7 @@ graph TD
     CE --> CC
     BE --> CC
     UE --> CC
+    DS --> CC
 ```
 
 ## Packages
@@ -47,6 +49,7 @@ graph TD
 | [`@theaiinc/realm-cli`](packages/realm-cli)             | `0.1.1` | CLI client for managing realms from the terminal                                 |
 | [`@theaiinc/realm-api`](packages/realm-api)             | `0.2.0` | Fastify REST API server exposing all realm operations                            |
 | [`@theaiinc/realm-veil`](packages/realm-veil)           | `0.1.1` | Veil PII redaction integration for secure agent outputs                          |
+| [`@theaiinc/realm-sandbox`](packages/realm-sandbox)     | `0.1.0` | Docker Sandbox engine: realms in Docker Agentic Platform sandboxes (cloud or local) via `sbx` |
 | `@theaiinc/realm-vm`                                    | —       | Apple Virtualization Framework engine _(in development)_                         |
 
 ## Quick Start

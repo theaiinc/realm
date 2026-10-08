@@ -1,0 +1,45 @@
+{
+  "name": "@theaiinc/realm-sandbox",
+  "version": "0.1.0",
+  "description": "Docker Sandbox engine for Realm — runs a realm in a Docker Agentic Platform sandbox (cloud or local) through the sbx CLI: kits, network policy and credential injection come from Docker",
+  "keywords": ["realm", "docker", "sandbox", "sbx", "docker-agentic-platform", "ai-agent"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@theaiinc/realm-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theaiinc/realm.git",
+    "directory": "packages/realm-sandbox"
+  },
+  "homepage": "https://github.com/theaiinc/realm/blob/main/packages/realm-sandbox/README.md",
+  "bugs": {
+    "url": "https://github.com/theaiinc/realm/issues"
+  }
+}

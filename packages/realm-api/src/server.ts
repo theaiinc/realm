@@ -6,6 +6,7 @@ import { ContainerEngine } from '@theaiinc/realm-container';
 import { BrowserEngine } from '@theaiinc/realm-browser';
 import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
 import { HostEngine } from '@theaiinc/realm-host';
+import { DockerSandboxEngine } from '@theaiinc/realm-sandbox';
 import { VeilPipeline } from '@theaiinc/realm-veil';
 import { isAuthorized, isPublicPath, resolveApiToken, resolveEngineTypes } from './auth.js';
 
@@ -41,6 +42,13 @@ export async function createServer(options?: RealmServerOptions) {
   if (process.env.ENABLE_HOST_ENGINE === 'true') {
     api.registerEngine(new HostEngine());
     console.warn('[realm-api] ENABLE_HOST_ENGINE=true — HostEngine registered (host process access, see packages/realm-host/README.md)');
+  }
+
+  // DockerSandboxEngine needs the sbx CLI signed in to Docker on this host,
+  // and cloud sandboxes bill per second: opt in explicitly.
+  if (process.env.ENABLE_DOCKER_SANDBOX_ENGINE === 'true') {
+    api.registerEngine(new DockerSandboxEngine());
+    console.warn('[realm-api] ENABLE_DOCKER_SANDBOX_ENGINE=true — DockerSandboxEngine registered (sbx CLI; cloud sandboxes bill per second)');
   }
 
   const app = Fastify({ logger: true });
