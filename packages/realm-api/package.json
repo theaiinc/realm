@@ -15,6 +15,7 @@
     "@theaiinc/realm-browser": "workspace:*",
     "@theaiinc/realm-ubuntu": "workspace:*",
     "@theaiinc/realm-host": "workspace:*",
+    "@theaiinc/realm-sandbox": "workspace:*",
     "@theaiinc/realm-veil": "workspace:*",
     "fastify": "^4.28.0",
     "@fastify/cors": "^9.0.0"

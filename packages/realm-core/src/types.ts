@@ -19,6 +19,12 @@ export enum EngineType {
    * arbitrary execute().
    */
   Host = 'host',
+  /**
+   * Docker Sandbox — a Docker Agentic Platform sandbox (cloud or local),
+   * driven through the `sbx` CLI (see packages/realm-sandbox). Headless:
+   * commands and files, no display.
+   */
+  DockerSandbox = 'docker-sandbox',
 }
 
 /** Network access levels */
