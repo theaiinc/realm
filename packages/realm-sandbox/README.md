@@ -13,7 +13,7 @@ brew trust docker/tap && brew install docker/tap/sbx
 sbx login
 ```
 
-Credentials (whatever your kit declares) go into Docker's secret store. With [Arcana](https://github.com/theaiinc/arcana), the value never passes through a terminal or realm-api: `arcana run --stdin-secret` pipes it into `sbx` after a phone approval:
+Credentials (whatever your kit declares) go into Docker's secret store. With Arcana (The AI Inc's local secret broker), the value never passes through a terminal or realm-api: `arcana run --stdin-secret` pipes it into `sbx` after a phone approval:
 
 ```sh
 arcana run --secret arcana://anthropic/api-key --stdin-secret -- sbx --cloud secret set anthropic --force
