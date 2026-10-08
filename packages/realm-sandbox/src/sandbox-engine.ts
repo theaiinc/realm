@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { RealmEngine } from '@theaiinc/realm-core';
@@ -13,14 +14,13 @@ export interface SbxResult {
   stderr: string;
 }
 
-/** Runs `sbx` with arguments; injectable so tests don't need Docker. */
+/** Runs a CLI with arguments; injectable so tests need neither Docker nor Arcana. */
 export type SbxRunner = (args: string[], options?: { timeoutMs?: number }) => Promise<SbxResult>;
 
-/** The real `sbx` CLI (SBX_BIN overrides the binary). Never throws on a non-zero exit. */
-export const runSbx: SbxRunner = (args, options = {}) =>
-  new Promise((resolve) => {
+function cliRunner(binary: () => string): SbxRunner {
+  return (args, options = {}) => new Promise((resolve) => {
     execFile(
-      process.env.SBX_BIN || 'sbx',
+      binary(),
       args,
       { maxBuffer: 32 * 1024 * 1024, timeout: options.timeoutMs ?? 15 * 60_000 },
       (error, stdout, stderr) => {
@@ -29,6 +29,18 @@ export const runSbx: SbxRunner = (args, options = {}) =>
       },
     );
   });
+}
+
+/** The real `sbx` CLI (SBX_BIN overrides the binary). Never throws on a non-zero exit. */
+export const runSbx: SbxRunner = cliRunner(() => process.env.SBX_BIN || 'sbx');
+
+/** Arcana (ARCANA_BIN overrides; default ~/.local/bin/arcana when present). */
+export const runArcana: SbxRunner = cliRunner(() => process.env.ARCANA_BIN || arcanaDefaultPath());
+
+function arcanaDefaultPath(): string {
+  const local = path.join(process.env.HOME || '', '.local/bin/arcana');
+  return existsSync(local) ? local : 'arcana';
+}
 
 /**
  * What a sandbox realm is made of. Engine settings travel in the realm's
@@ -44,6 +56,7 @@ export const runSbx: SbxRunner = (args, options = {}) =>
  * | SANDBOX_CPUS / SANDBOX_MEMORY | Size, e.g. `1` and `2g` (cloud default 2 / 4g) |
  * | SANDBOX_TTL | Cloud time-to-live (e.g. `45m`); the sandbox stops when it lapses |
  * | SANDBOX_ALLOW_NETWORK | Extra egress hosts, comma separated (restricted mode) |
+ * | SANDBOX_SECRETS | `service=arcana://ref` pairs, comma separated: credentials Arcana hands to sbx |
  */
 export interface SandboxRecord {
   name: string;
@@ -55,6 +68,8 @@ export interface SandboxRecord {
   memory?: string;
   ttl?: string;
   allowNetwork: string[];
+  /** Docker credential service → Arcana reference (never a value). */
+  secrets: Array<{ service: string; reference: string }>;
   networkMode: NetworkMode;
   env: Record<string, string>;
   /** Created in Docker (it exists, running or stopped). */
@@ -63,6 +78,7 @@ export interface SandboxRecord {
 
 const SANDBOX_KEYS = new Set([
   'SANDBOX_KIT', 'SANDBOX_KIT_ARGS', 'SANDBOX_CLOUD', 'SANDBOX_CPUS', 'SANDBOX_MEMORY', 'SANDBOX_TTL', 'SANDBOX_ALLOW_NETWORK',
+  'SANDBOX_SECRETS',
 ]);
 
 function notSupported(operation: string): RealmError {
@@ -92,6 +108,28 @@ export function parseKitArgs(value: string | undefined): string[] {
     });
 }
 
+/**
+ * `anthropic=arcana://anthropic/api-key, github=arcana://github/me/token` →
+ * pairs. Only Arcana references are accepted: a realm config must never carry
+ * a credential value.
+ */
+export function parseSecrets(value: string | undefined): Array<{ service: string; reference: string }> {
+  return String(value ?? '')
+    .split(/[,\n]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const match = /^([a-z][a-z0-9-]*)=(arcana:\/\/\S+)$/.exec(entry);
+      if (!match) {
+        throw new RealmError(
+          `SANDBOX_SECRETS entry "${entry.split('=')[0]}=…" must be service=arcana://reference (values are never accepted)`,
+          'SANDBOX_INVALID_CONFIG',
+        );
+      }
+      return { service: match[1] as string, reference: match[2] as string };
+    });
+}
+
 /** Sandbox names are visible in Docker; keep them short, stable and safe. */
 export function sandboxNameFor(realmName: string, realmId: string): string {
   const slug = realmName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'realm';
@@ -112,7 +150,10 @@ export class DockerSandboxEngine implements RealmEngine {
   private readonly realms = new Map<string, SandboxRecord>();
   private readonly startedAt = Date.now();
 
-  constructor(private readonly sbx: SbxRunner = runSbx) {}
+  constructor(
+    private readonly sbx: SbxRunner = runSbx,
+    private readonly arcana: SbxRunner = runArcana,
+  ) {}
 
   private record(realmId: string): SandboxRecord {
     const record = this.realms.get(realmId);
@@ -146,6 +187,7 @@ export class DockerSandboxEngine implements RealmEngine {
       memory: env['SANDBOX_MEMORY']?.trim() || undefined,
       ttl: env['SANDBOX_TTL']?.trim() || undefined,
       allowNetwork: (env['SANDBOX_ALLOW_NETWORK'] ?? '').split(',').map((h) => h.trim()).filter(Boolean),
+      secrets: parseSecrets(env['SANDBOX_SECRETS']),
       networkMode,
       env: passthrough,
       created: false,
@@ -169,8 +211,27 @@ export class DockerSandboxEngine implements RealmEngine {
     return args;
   }
 
+  /**
+   * Hand each SANDBOX_SECRETS credential from Arcana to Docker's secret store:
+   * `arcana run --stdin-secret` pipes the value into `sbx secret set`, after
+   * the person approves that use on their phone. The value never passes
+   * through this process. Global scope, because Docker's kit build and the
+   * new sandbox both need it before a per-sandbox scope could exist.
+   */
+  private async pushSecrets(record: SandboxRecord, realmId: string): Promise<void> {
+    const sbxBin = process.env.SBX_BIN || 'sbx';
+    for (const { service, reference } of record.secrets) {
+      const result = await this.arcana(
+        ['run', '--secret', reference, '--stdin-secret', '--', sbxBin, ...this.scope(record), 'secret', 'set', service, '--force'],
+        { timeoutMs: 6 * 60_000 }, // Arcana waits up to 5 minutes for the phone
+      );
+      if (result.code !== 0) throw failed(`Handing the ${service} credential from Arcana to Docker`, result, { realmId, service, reference });
+    }
+  }
+
   async start(realmId: string): Promise<RealmSession> {
     const record = this.record(realmId);
+    if (!record.created && record.secrets.length) await this.pushSecrets(record, realmId);
     // First start creates the sandbox; later starts restart the same one
     // (its files, links and caches survive a stop).
     const args = record.created

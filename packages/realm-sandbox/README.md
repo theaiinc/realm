@@ -11,8 +11,15 @@ The engine is headless: `execute`, file import/export/list, lifecycle and networ
 ```sh
 brew trust docker/tap && brew install docker/tap/sbx
 sbx login
-sbx --cloud secret set anthropic   # whatever credentials your kit declares
 ```
+
+Credentials (whatever your kit declares) go into Docker's secret store. With [Arcana](https://github.com/theaiinc/arcana), the value never passes through a terminal or realm-api: `arcana run --stdin-secret` pipes it into `sbx` after a phone approval:
+
+```sh
+arcana run --secret arcana://anthropic/api-key --stdin-secret -- sbx --cloud secret set anthropic --force
+```
+
+Or let the engine do it per realm with `SANDBOX_SECRETS` (below).
 
 realm-api registers the engine only when asked, because it needs a signed-in `sbx` and cloud sandboxes bill per second:
 
@@ -32,6 +39,7 @@ Engine settings travel in the realm's `environment` (the same convention as real
 | `SANDBOX_CPUS`, `SANDBOX_MEMORY` | Size, e.g. `1` and `2g` (cloud default: 2 CPUs, 4 GiB) |
 | `SANDBOX_TTL` | Cloud time-to-live, e.g. `45m`; the sandbox stops when it lapses |
 | `SANDBOX_ALLOW_NETWORK` | Extra egress hosts, comma separated |
+| `SANDBOX_SECRETS` | `service=arcana://reference` pairs, comma separated. Before the sandbox is created, each value is piped from Arcana into `sbx secret set` (phone approval). Only `arcana://` references are accepted, never values. |
 
 ```sh
 curl -X POST localhost:8542/api/v1/realms -H 'content-type: application/json' -d '{
@@ -55,6 +63,7 @@ Network modes: `restricted` (default) is the kit's allowlist plus `SANDBOX_ALLOW
 
 ## Notes
 
+- `SANDBOX_SECRETS` writes to Docker's global secret store: Docker's kit build and the new sandbox both need the credential before a per-sandbox scope could exist. `ARCANA_BIN` overrides the Arcana binary (default `~/.local/bin/arcana`).
 - Local sandboxes need `sbx policy init <allow-all|balanced|deny-all>` once per machine.
 - In a cloud sandbox, a kit credential marked `required` fails Docker's kit build (the bake sandbox has no secrets); declare it optional and let the workload report a missing credential.
 - `--static-mcp` (MCP servers fixed at creation) only accepts Docker's hosted catalog; custom MCP servers are attached from the web UI.

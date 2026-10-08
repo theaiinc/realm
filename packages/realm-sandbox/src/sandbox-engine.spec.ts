@@ -127,3 +127,40 @@ describe('DockerSandboxEngine', () => {
     expect(() => parseKitArgs('novalue')).toThrow('name=value');
   });
 });
+
+describe('credentials from Arcana', () => {
+  it('pipes each SANDBOX_SECRETS reference from Arcana into sbx before the sandbox is created', async () => {
+    const order: string[] = [];
+    const sbx = fakeSbx((args) => { order.push(`sbx ${args[1]}`); return {}; });
+    const arcanaCalls: string[][] = [];
+    const arcana = async (args: string[]) => { arcanaCalls.push(args); order.push('arcana'); return { code: 0, stdout: 'Saved secret', stderr: '' }; };
+    const engine = new DockerSandboxEngine(sbx.run, arcana);
+    const id = await engine.create({
+      name: 'dev', engine: EngineType.DockerSandbox,
+      environment: { SANDBOX_KIT: 'claude', SANDBOX_SECRETS: 'anthropic=arcana://anthropic/api-key, github=arcana://github/me/token' },
+    });
+    await engine.start(id);
+    expect(arcanaCalls).toEqual([
+      ['run', '--secret', 'arcana://anthropic/api-key', '--stdin-secret', '--', 'sbx', '--cloud', 'secret', 'set', 'anthropic', '--force'],
+      ['run', '--secret', 'arcana://github/me/token', '--stdin-secret', '--', 'sbx', '--cloud', 'secret', 'set', 'github', '--force'],
+    ]);
+    expect(order).toEqual(['arcana', 'arcana', 'sbx run']);
+    // Not passed into the sandbox as an env var, and not pushed again on restart.
+    expect((sbx.calls[0] ?? []).join(' ')).not.toContain('arcana://');
+    await engine.stop(id);
+    await engine.start(id);
+    expect(arcanaCalls).toHaveLength(2);
+  });
+
+  it('accepts only Arcana references, never a value', async () => {
+    const engine = new DockerSandboxEngine(fakeSbx().run, async () => ({ code: 0, stdout: '', stderr: '' }));
+    await expect(engine.create({ name: 'x', engine: EngineType.DockerSandbox, environment: { SANDBOX_KIT: 'claude', SANDBOX_SECRETS: 'anthropic=sk-ant-api03-abc' } }))
+      .rejects.toThrow('values are never accepted');
+  });
+
+  it('a denied or timed-out phone approval stops the start with Arcana\'s reason', async () => {
+    const engine = new DockerSandboxEngine(fakeSbx().run, async () => ({ code: 1, stdout: '', stderr: 'arcana: denied on your phone' }));
+    const id = await engine.create({ name: 'x', engine: EngineType.DockerSandbox, environment: { SANDBOX_KIT: 'claude', SANDBOX_SECRETS: 'anthropic=arcana://anthropic/api-key' } });
+    await expect(engine.start(id)).rejects.toThrow('denied on your phone');
+  });
+});
