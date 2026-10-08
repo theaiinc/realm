@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "realm-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "RealmContainer",
+      "image": "../../Dockerfile.api",
+      "image_build_context": "../..",
+      // Chromium needs real memory; 1/2 vCPU, 4 GiB, 8 GB disk.
+      "instance_type": "standard-1",
+      // realm-api keeps realms in memory, so there is exactly one instance.
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "REALM", "class_name": "RealmContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RealmContainer"] }],
+  "vars": {
+    "REALM_ENGINES": "browser",
+    "REALM_SLEEP_AFTER": "30m"
+  },
+  // REALM_API_TOKEN is a secret: `wrangler secret put REALM_API_TOKEN`.
+  // Without it the Worker answers 503 and never starts the container.
+  "routes": [{ "pattern": "realm-api.theaiinc.com", "custom_domain": true }]
+}

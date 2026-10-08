@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+**/.realm-data
+**/.wrangler
+.git
+**/*.log
+amazon-screenshot.png

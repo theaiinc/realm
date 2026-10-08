@@ -1,0 +1,37 @@
+# realm-api with the browser engine, for hosts without a Docker daemon
+# (Cloudflare Containers, see packages/realm-cloudflare). Build from the repo
+# root: docker build -f Dockerfile.api .
+
+FROM node:22-bookworm-slim AS build
+RUN npm install -g pnpm@10.32.1
+WORKDIR /repo
+COPY . .
+RUN pnpm install --frozen-lockfile --filter "@theaiinc/realm-api..."
+# The root build script stops at the first package without src/index.ts and
+# hides the failure, so build exactly what realm-api imports, in order.
+RUN set -e; \
+    for pkg in realm-core realm-veil realm-container realm-browser realm-ubuntu realm-host; do \
+      (cd "packages/$pkg" && npx tsup src/index.ts --format esm --clean); \
+    done; \
+    cd packages/realm-api && npx tsup src/server.ts --format esm --clean
+RUN pnpm --filter @theaiinc/realm-api deploy --prod --legacy /app
+
+FROM node:22-bookworm-slim
+ENV NODE_ENV=production \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    REALM_HOST=0.0.0.0 \
+    REALM_PORT=8542 \
+    REALM_ENGINES=browser
+WORKDIR /app
+COPY --from=build /app /app
+RUN set -e; \
+    cli="$(find /app/node_modules -path '*/node_modules/playwright/cli.js' | head -n 1)"; \
+    test -n "$cli"; \
+    node "$cli" install --with-deps chromium; \
+    rm -rf /var/lib/apt/lists/*; \
+    mkdir -p /app/.realm-data; \
+    chown -R node:node /app/.realm-data
+USER node
+EXPOSE 8542
+# realm-api refuses to start on 0.0.0.0 without REALM_API_TOKEN.
+CMD ["node", "dist/server.js"]

@@ -7,6 +7,7 @@ import { BrowserEngine } from '@theaiinc/realm-browser';
 import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
 import { HostEngine } from '@theaiinc/realm-host';
 import { VeilPipeline } from '@theaiinc/realm-veil';
+import { isAuthorized, isPublicPath, resolveApiToken, resolveEngineTypes } from './auth.js';
 
 interface RealmServerOptions {
   port?: number;
@@ -23,10 +24,15 @@ export async function createServer(options?: RealmServerOptions) {
   const api = new RealmAPI(auditLogger);
   const veil = new VeilPipeline({ enabled: process.env.REALM_VEIL_ENABLED !== 'false' });
 
-  // Register engines
-  api.registerEngine(new ContainerEngine());
-  api.registerEngine(new BrowserEngine());
-  api.registerEngine(new UbuntuEngine());
+  // Fail closed before anything is registered: a non-loopback bind without a
+  // token would hand /exec to anyone who can reach the port. See auth.ts.
+  const apiToken = resolveApiToken(process.env, host);
+
+  // Register engines (REALM_ENGINES narrows this on hosts without Docker)
+  const engineTypes = resolveEngineTypes(process.env.REALM_ENGINES);
+  if (engineTypes.includes('container')) api.registerEngine(new ContainerEngine());
+  if (engineTypes.includes('browser')) api.registerEngine(new BrowserEngine());
+  if (engineTypes.includes('ubuntu')) api.registerEngine(new UbuntuEngine());
 
   // HostEngine is a deliberate, narrow exception to "agent never works
   // directly on the host machine" (docs/product-design.prd) — see
@@ -40,6 +46,15 @@ export async function createServer(options?: RealmServerOptions) {
   const app = Fastify({ logger: true });
 
   await app.register(cors, { origin: true });
+
+  if (apiToken) {
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.method === 'OPTIONS' || isPublicPath(request.url)) return;
+      if (!isAuthorized(request.headers.authorization, apiToken)) {
+        return reply.status(401).send({ error: 'Authentication required' });
+      }
+    });
+  }
 
   // Health check
   app.get('/api/v1/health', async () => ({
