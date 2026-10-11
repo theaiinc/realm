@@ -42,12 +42,12 @@ graph TD
 
 | Package                                                 | Version | Description                                                                      |
 | ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------- |
-| [`@theaiinc/realm-core`](packages/realm-core)           | `0.2.0` | Core abstractions, types, and API facade — the universal engine interface        |
+| [`@theaiinc/realm-core`](packages/realm-core)           | `0.3.0` | Core abstractions, types, and API facade — the universal engine interface        |
 | [`@theaiinc/realm-container`](packages/realm-container) | `0.1.1` | Docker-based container engine with filesystem, network, and lifecycle management |
 | [`@theaiinc/realm-browser`](packages/realm-browser)     | `0.1.1` | Playwright/Chromium browser engine for web automation                            |
 | [`@theaiinc/realm-ubuntu`](packages/realm-ubuntu)       | `0.1.1` | Ubuntu Desktop engine with XFCE4, VNC, Chromium, and embedded Ratatoskr daemon   |
 | [`@theaiinc/realm-cli`](packages/realm-cli)             | `0.1.1` | CLI client for managing realms from the terminal                                 |
-| [`@theaiinc/realm-api`](packages/realm-api)             | `0.2.0` | Fastify REST API server exposing all realm operations                            |
+| [`@theaiinc/realm-api`](packages/realm-api)             | `0.3.0` | Fastify REST API server exposing all realm operations                            |
 | [`@theaiinc/realm-veil`](packages/realm-veil)           | `0.1.1` | Veil PII redaction integration for secure agent outputs                          |
 | [`@theaiinc/realm-sandbox`](packages/realm-sandbox)     | `0.1.0` | Docker Sandbox engine: realms in Docker Agentic Platform sandboxes (cloud or local) via `sbx` |
 | `@theaiinc/realm-vm`                                    | —       | Apple Virtualization Framework engine _(in development)_                         |
