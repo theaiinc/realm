@@ -40,6 +40,7 @@ jobs:
             core)      DIR="realm-core" ;;
             ubuntu)    DIR="realm-ubuntu" ;;
             veil)      DIR="realm-veil" ;;
+            sandbox)   DIR="realm-sandbox" ;;
             *)
               echo "::error::Unknown package prefix '$NAME' in tag $GITHUB_REF_NAME"
               exit 1

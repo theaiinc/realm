@@ -1,6 +1,6 @@
 {
   "name": "@theaiinc/realm-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Fastify HTTP API server for Realm — exposes realm lifecycle, execution, and audit endpoints over REST",
   "keywords": ["realm", "api", "fastify", "rest", "ai-agent", "orchestration"],
   "type": "module",
