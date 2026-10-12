@@ -41,6 +41,7 @@ jobs:
             ubuntu)    DIR="realm-ubuntu" ;;
             veil)      DIR="realm-veil" ;;
             sandbox)   DIR="realm-sandbox" ;;
+            host)      DIR="realm-host" ;;
             *)
               echo "::error::Unknown package prefix '$NAME' in tag $GITHUB_REF_NAME"
               exit 1
@@ -48,36 +49,20 @@ jobs:
           esac
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Exchange OIDC token and publish
-        env:
-          PKG_DIR: ${{ steps.pkg.outputs.dir }}
+      # npm >= 11.5.1 does the trusted-publishing (OIDC) exchange itself. pnpm pack first so
+      # workspace:* dependencies become real version ranges in the published package.json.
+      - name: Set up npm trusted publishing
+        run: npm install --global npm@11.5.1
+
+      - name: Pack and publish
+        working-directory: packages/${{ steps.pkg.outputs.dir }}
         run: |
-          PKG_NAME=$(node -p "require('./packages/$PKG_DIR/package.json').name")
-          PKG_ENC=$(node -p "encodeURIComponent('$PKG_NAME')")
-          echo "Publishing $PKG_NAME (encoded: $PKG_ENC)"
+          rm -f *.tgz
+          pnpm pack
+          npm --version
+          # Verbose so the log shows npm's trusted-publishing (OIDC) exchange and why it fails, if it does.
+          npm publish ./*.tgz --access public --loglevel verbose
 
-          echo "=== Step 1: Get GitHub OIDC id_token ==="
-          JWT=$(curl -sSL \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
-            | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).value")
-          echo "JWT length: ${#JWT}"
-
-          echo "=== Step 2: Exchange with npm ==="
-          HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/exchange-result.json \
-            -X POST \
-            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$PKG_ENC" \
-            -H "Authorization: Bearer $JWT")
-          echo "Exchange HTTP code: $HTTP_CODE"
-          echo "Response: $(cat /tmp/exchange-result.json)"
-
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "::error::OIDC token exchange failed"
-            exit 1
-          fi
-
-          NPM_TOKEN=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/exchange-result.json','utf8')).token")
-          echo "Token obtained: ${#NPM_TOKEN} chars"
-
-          export NPM_TOKEN
-          pnpm publish --filter "./packages/$PKG_DIR" --no-git-checks
+      - name: Show npm's OIDC log lines
+        if: failure()
+        run: grep -hiE 'oidc|trusted|provenance|id-token|ENEEDAUTH' ~/.npm/_logs/*-debug-*.log || true
