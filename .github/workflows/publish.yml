@@ -59,4 +59,10 @@ jobs:
         run: |
           rm -f *.tgz
           pnpm pack
-          npm publish ./*.tgz --access public
+          npm --version
+          # Verbose so the log shows npm's trusted-publishing (OIDC) exchange and why it fails, if it does.
+          npm publish ./*.tgz --access public --loglevel verbose
+
+      - name: Show npm's OIDC log lines
+        if: failure()
+        run: grep -hiE 'oidc|trusted|provenance|id-token|ENEEDAUTH' ~/.npm/_logs/*-debug-*.log || true
