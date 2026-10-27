@@ -118,10 +118,12 @@ type ObjectStore = {
     async putFile(realmId: string, path: string, data: Buffer | NodeJS.ReadableStream) {
       const safe = this.safePath(path);
       await this.store.save(`realms/${realmId}/files/${safe}`, data);
-      return { path: safe };
+      const stored = await this.store.load(`realms/${realmId}/files/${safe}`);
+      return { path: safe, size: stored.length };
     }
     async getFile(realmId: string, path: string) {
-      return this.store.load(`realms/${realmId}/files/${this.safePath(path)}`);
+      const data = await this.store.load(`realms/${realmId}/files/${this.safePath(path)}`);
+      return { data, size: data.length };
     }
     async startJob(realmId: string, spec: RealmJobSpec) {
       const jobId = randomUUID();
