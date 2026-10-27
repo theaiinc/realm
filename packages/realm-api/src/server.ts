@@ -331,6 +331,51 @@ export async function createServer(options?: RealmServerOptions) {
     },
   );
 
+  // Workspace files
+  app.put<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/v1/realms/:id/files',
+    async (request, reply) => {
+      const filePath = request.query.path;
+      if (!filePath || filePath.startsWith('/') || filePath.split(/[\\/]/).includes('..')) {
+        return reply.status(400).send({ error: 'path must be a relative path without ..' });
+      }
+      let size = 0;
+      const chunks: Buffer[] = [];
+      try {
+        for await (const chunk of request.raw) {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          size += buffer.length;
+          if (size > 500 * 1024 * 1024) {
+            return reply.status(413).send({ error: 'file exceeds 500 MB limit' });
+          }
+          chunks.push(buffer);
+        }
+        const result = await api.putFile(request.params.id, filePath, Buffer.concat(chunks));
+        return reply.status(201).send(result);
+      } catch (error) {
+        return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/v1/realms/:id/files',
+    async (request, reply) => {
+      const filePath = request.query.path;
+      if (!filePath || filePath.startsWith('/') || filePath.split(/[\\/]/).includes('..')) {
+        return reply.status(400).send({ error: 'path must be a relative path without ..' });
+      }
+      try {
+        const data = await api.getFile(request.params.id, filePath);
+        reply.type('application/octet-stream');
+        return reply.send(data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return reply.status(message.includes('not found') ? 404 : 400).send({ error: message });
+      }
+    },
+  );
+
   // Set location (only realms whose engine supports RealmEngine.setLocation, e.g. realm-host)
   app.post<{ Params: { id: string }; Body: { latitude: number; longitude: number } }>(
     '/api/v1/realms/:id/location',

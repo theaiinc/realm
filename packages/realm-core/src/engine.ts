@@ -44,10 +44,6 @@ export interface RealmJobResult {
 }
 
 export interface RealmEngine {
-  /** Store a workspace file and return its metadata. */
-  putFile?(realmId: string, path: string, data: AsyncIterable<Uint8Array> | Uint8Array): Promise<FileRef>;
-  /** Read a workspace file, or return undefined when absent. */
-  getFile?(realmId: string, path: string): Promise<{ data: AsyncIterable<Uint8Array>; size: number } | undefined>;
   /** Unique engine type identifier */
   readonly type: EngineType;
 
@@ -106,7 +102,6 @@ export interface RealmEngine {
   getFile(realmId: string, path: string): Promise<Uint8Array>;
 
   /** Set network mode for the realm */
-crlf: false
   setNetworkMode(realmId: string, mode: NetworkMode, allowedDomains?: string[]): Promise<void>;
 
   /** Health check for the engine instance */

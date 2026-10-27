@@ -7,7 +7,6 @@ import type {
   RealmEngine,
   RealmJobResult,
   RealmJobSpec,
-  RealmJobStartResult,
   RealmSession,
 } from '@theaiinc/realm-core';
 import { EngineType, NetworkMode, RealmState } from '@theaiinc/realm-core';
@@ -122,8 +121,7 @@ type ObjectStore = {
       return { path: safe, size: stored.length };
     }
     async getFile(realmId: string, path: string) {
-      const data = await this.store.load(`realms/${realmId}/files/${this.safePath(path)}`);
-      return { data, size: data.length };
+      return await this.store.load(`realms/${realmId}/files/${this.safePath(path)}`);
     }
     async startJob(realmId: string, spec: RealmJobSpec) {
       const jobId = randomUUID();
@@ -141,14 +139,27 @@ type ObjectStore = {
       return { jobId };
     }
     async getJob(realmId: string, jobId: string, options: { logOffset?: number } = {}): Promise<RealmJobResult> {
-      const offset = options.logOffset ?? 0;
+      const offset = Math.max(0, options.logOffset ?? 0);
       const prefix = `realms/${realmId}/jobs/${jobId}/log/`;
-      const logs = (await this.store.list(prefix)).sort();
-      const all = Buffer.concat(await Promise.all(logs.map(name => this.store.load(name)))).toString();
-      let state: RealmJobResult['state'] = 'running';
+      const logs = (await this.store.list(prefix)).sort((a, b) => a.localeCompare(b));
+      const all = Buffer.concat(await Promise.all(logs.map(name => this.store.load(name))));
+      let state: RealmJobResult['state'] = 'queued';
       let result: any;
-      try { result = JSON.parse((await this.store.load(`realms/${realmId}/jobs/${jobId}/result.json`)).toString()); state = result.timed_out ? 'timed_out' : result.cancelled ? 'cancelled' : result.exit_code === 0 ? 'succeeded' : 'failed'; } catch {}
-      return { state, exitCode: result?.exit_code, log: all.slice(offset), nextOffset: Buffer.byteLength(all), runtimeSec: result?.runtime_seconds, filesChanged: result?.changed_files };
+      try {
+        result = JSON.parse((await this.store.load(`realms/${realmId}/jobs/${jobId}/result.json`)).toString());
+        state = result.timed_out ? 'timed_out' : result.cancelled ? 'cancelled' : result.exit_code === 0 ? 'succeeded' : 'failed';
+      } catch {
+        try {
+          const executionName = (await this.store.load(`realms/${realmId}/jobs/${jobId}/execution`)).toString();
+          const execution = await this.run.getExecution(executionName);
+          const condition = execution?.status?.conditions?.find((entry: any) => entry.type === 'Completed' || entry.type === 'Succeeded');
+          const ended = Boolean(execution?.completionTime || execution?.status?.completionTime || condition?.status === 'False');
+          state = ended ? 'failed' : execution?.runningCount || execution?.status?.runningCount ? 'running' : 'queued';
+          if (ended && condition?.message) all.write(`[runner] ${condition.message}\n`);
+        } catch {}
+      }
+      const nextOffset = all.length;
+      return { state, exitCode: result?.exit_code, log: all.subarray(Math.min(offset, all.length)).toString(), nextOffset, runtimeSec: result?.runtime_seconds, filesChanged: result?.changed_files };
     }
     async cancelJob(realmId: string, jobId: string) {
       const name = this.executions.get(`${realmId}/${jobId}`) ?? (await this.store.load(`realms/${realmId}/jobs/${jobId}/execution`)).toString();
