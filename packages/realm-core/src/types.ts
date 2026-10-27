@@ -25,6 +25,7 @@ export enum EngineType {
    * commands and files, no display.
    */
   DockerSandbox = 'docker-sandbox',
+  CloudRunJob = 'cloudrun-job',
 }
 
 /** Network access levels */

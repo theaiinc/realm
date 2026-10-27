@@ -50,6 +50,7 @@ graph TD
 | [`@theaiinc/realm-api`](packages/realm-api)             | `0.3.0` | Fastify REST API server exposing all realm operations                            |
 | [`@theaiinc/realm-veil`](packages/realm-veil)           | `0.1.1` | Veil PII redaction integration for secure agent outputs                          |
 | [`@theaiinc/realm-sandbox`](packages/realm-sandbox)     | `0.1.0` | Docker Sandbox engine: realms in Docker Agentic Platform sandboxes (cloud or local) via `sbx` |
+| [`@theaiinc/realm-cloudrun`](packages/realm-cloudrun)   | `0.1.0` | Cloud Run Job engine for durable, long-running background jobs                              |
 | `@theaiinc/realm-vm`                                    | —       | Apple Virtualization Framework engine _(in development)_                         |
 
 ## Quick Start
@@ -78,6 +79,10 @@ pnpm realm stop <realm-id>
 pnpm realm destroy <realm-id>
 ```
 
+### Hosted background jobs
+
+The `cloudrun-job` engine runs each job in a throwaway Cloud Run Job execution while storing realm files, logs, and results in GCS. Deploy `realm-api` with the Cloud Run engine as a container next to Simasis on the GCE VM. Set `ENABLE_CLOUDRUN_ENGINE=true` and `REALM_STATE_DIR` to a persistent volume; the API should be reachable only on the host's network.
+
 ## API Endpoints
 
 | Method | Path                         | Description          |
@@ -95,6 +100,11 @@ pnpm realm destroy <realm-id>
 | POST   | `/api/v1/realms/:id/exec`    | Execute command      |
 | POST   | `/api/v1/realms/:id/import`  | Import file          |
 | POST   | `/api/v1/realms/:id/export`  | Export file          |
+| POST   | `/api/v1/realms/:id/jobs`    | Start a long-running job |
+| GET    | `/api/v1/realms/:id/jobs/:jobId?offset=N` | Get job state and incremental logs |
+| DELETE | `/api/v1/realms/:id/jobs/:jobId` | Cancel a running job |
+| PUT    | `/api/v1/realms/:id/files?path=<rel path>` | Upload a realm file (streamed) |
+| GET    | `/api/v1/realms/:id/files?path=<rel path>` | Download a realm file |
 | GET    | `/api/v1/audit`              | Get audit log        |
 
 ## Security Model
