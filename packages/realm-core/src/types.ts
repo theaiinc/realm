@@ -64,13 +64,23 @@ export enum PermissionType {
  * Session capabilities — granted at session creation, enforced by PermissionManager.
  * Mirrors the Yggdrasil SessionCapability type for cross-system compatibility.
  */
-export type SessionCapability = 'observe' | 'mouse' | 'keyboard' | 'touch' | 'scroll' | 'drag' | 'clipboard' | 'audio' | 'camera';
+export type SessionCapability = 'observe' | 'mouse' | 'keyboard' | 'touch' | 'scroll' | 'drag' | 'clipboard' | 'audio' | 'camera' | 'execute';
 
 /**
  * Realm operations that require capability enforcement.
  * Each operation maps to exactly one required capability.
  */
-export type Operation = 'capture' | 'click' | 'type' | 'scroll' | 'keyPress' | 'drag' | 'clipboard' | 'microphone' | 'camera';
+export type Operation =
+  | 'capture'
+  | 'click'
+  | 'type'
+  | 'scroll'
+  | 'keyPress'
+  | 'drag'
+  | 'clipboard'
+  | 'microphone'
+  | 'camera'
+  | 'execute';
 
 /**
  * Mapping from operation to the capability required.
@@ -86,6 +96,7 @@ export const OPERATION_CAPABILITIES: Record<Operation, SessionCapability> = {
   clipboard: 'clipboard',
   microphone: 'audio',
   camera: 'camera',
+  execute: 'execute',
 };
 
 /**
@@ -145,6 +156,31 @@ export interface FileRef {
   name: string;
   sizeBytes: number;
   mimeType?: string;
+}
+
+/** Specification for a long-running job executed by a Realm engine. */
+export interface RealmJobSpec {
+  command: string;
+  cwd?: string;
+  timeoutSec?: number;
+  env?: Record<string, string>;
+}
+
+/** Result returned when a long-running job is started. */
+export interface RealmJobStartResult {
+  jobId: string;
+}
+
+/** Current status and incremental output for a long-running job. */
+export interface RealmJobResult {
+  state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
+  exitCode?: number;
+  log: string;
+  nextOffset: number;
+  startedAt?: string;
+  endedAt?: string;
+  runtimeSec?: number;
+  filesChanged?: number;
 }
 
 /** Result of an action executed in a Realm */

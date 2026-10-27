@@ -13,7 +13,7 @@
     },
     "files": ["dist"],
     "scripts": {
-      "build": "tsup src/index.ts --format esm --dts --clean",
+      "build": "corepack pnpm --filter @theaiinc/realm-core build && tsup src/index.ts --format esm --dts --clean",
       "test": "vitest run"
     },
     "dependencies": {
@@ -25,7 +25,8 @@
     "devDependencies": {
       "tsup": "^8.0.0",
       "typescript": "^5.3.0",
-      "vitest": "^3.2.0"
+      "vitest": "^3.2.0",
+      "@types/node": "^22.0.0"
     },
     "publishConfig": {
       "access": "public"
