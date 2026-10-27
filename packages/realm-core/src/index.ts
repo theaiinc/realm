@@ -24,7 +24,13 @@ export {
   OPERATION_CAPABILITIES,
 } from './types.js';
 
-export type { RealmEngine } from './engine.js';
+export type {
+  RealmEngine,
+  RealmJobSpec,
+  RealmJobState,
+  RealmJobStartResult,
+  RealmJobResult,
+} from './engine.js';
 
 export {
   RealmAPI,

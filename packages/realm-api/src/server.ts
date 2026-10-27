@@ -286,6 +286,51 @@ export async function createServer(options?: RealmServerOptions) {
     },
   );
 
+  // Long-running jobs
+  app.post<{
+    Params: { id: string };
+    Body: { command: string; cwd?: string; timeoutSec?: number; env?: Record<string, string> };
+  }>('/api/v1/realms/:id/jobs', async (request, reply) => {
+    try {
+      const result = await api.startJob(request.params.id, request.body);
+      return reply.status(201).send(result);
+    } catch (error) {
+      return reply.status(400).send({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get<{
+    Params: { id: string; jobId: string };
+    Querystring: { offset?: string };
+  }>('/api/v1/realms/:id/jobs/:jobId', async (request, reply) => {
+    try {
+      const result = await api.getJob(request.params.id, request.params.jobId, {
+        logOffset: request.query.offset === undefined ? undefined : Number(request.query.offset),
+      });
+      return result;
+    } catch (error) {
+      return reply.status(400).send({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete<{ Params: { id: string; jobId: string } }>(
+    '/api/v1/realms/:id/jobs/:jobId',
+    async (request, reply) => {
+      try {
+        await api.cancelJob(request.params.id, request.params.jobId);
+        return reply.status(202).send();
+      } catch (error) {
+        return reply.status(400).send({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
   // Set location (only realms whose engine supports RealmEngine.setLocation, e.g. realm-host)
   app.post<{ Params: { id: string }; Body: { latitude: number; longitude: number } }>(
     '/api/v1/realms/:id/location',

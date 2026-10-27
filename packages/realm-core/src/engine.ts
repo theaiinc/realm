@@ -13,6 +13,36 @@ import type {
  * Engines are stateless wrappers around a backing technology (Docker, Playwright, etc.)
  * Realm API layer manages engine selection and lifecycle.
  */
+export interface RealmJobSpec {
+  command: string;
+  cwd?: string;
+  timeoutSec?: number;
+  env?: Record<string, string>;
+}
+
+export type RealmJobState =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'timed_out';
+
+export interface RealmJobStartResult {
+  jobId: string;
+}
+
+export interface RealmJobResult {
+  state: RealmJobState;
+  exitCode?: number;
+  log: string;
+  nextOffset: number;
+  startedAt?: string;
+  endedAt?: string;
+  runtimeSec?: number;
+  filesChanged?: number;
+}
+
 export interface RealmEngine {
   /** Unique engine type identifier */
   readonly type: EngineType;
@@ -36,7 +66,7 @@ export interface RealmEngine {
   destroy(realmId: string): Promise<void>;
 
   /** Capture the current display state (screenshot bytes) */
-  capture(realmId: string): Promise<Buffer>;
+  capture(realmId: string): Promise<Uint8Array>;
 
   /** Click at screen coordinates */
   click(realmId: string, x: number, y: number, button?: 'left' | 'right' | 'middle'): Promise<ActionResult>;
@@ -70,6 +100,15 @@ export interface RealmEngine {
 
   /** Health check for the engine instance */
   health(): Promise<{ status: 'healthy' | 'degraded' | 'unhealthy'; uptimeSec: number }>;
+
+  /** Start a long-running job, if supported by this engine. */
+  startJob?(realmId: string, spec: RealmJobSpec): Promise<RealmJobStartResult>;
+
+  /** Retrieve a long-running job's status and incremental logs. */
+  getJob?(realmId: string, jobId: string, options?: { logOffset?: number }): Promise<RealmJobResult>;
+
+  /** Cancel a long-running job, if supported by this engine. */
+  cancelJob?(realmId: string, jobId: string): Promise<void>;
 
   /**
    * Set mock geolocation for the realm, if the engine supports it (e.g.
