@@ -1,19 +1,18 @@
-|
-  import { randomUUID } from 'node:crypto';
-  import type {
-    ActionResult,
-    FileRef,
-    RealmConfig,
-    RealmEngine,
-    RealmJobResult,
-    RealmJobSpec,
-    RealmSession,
-  } from '@theaiinc/realm-core';
-  import { EngineType, NetworkMode, RealmState } from '@theaiinc/realm-core';
-  import { Storage } from '@google-cloud/storage';
-  import { GoogleAuth } from 'google-auth-library';
+import { randomUUID } from 'node:crypto';
+import type {
+  ActionResult,
+  FileRef,
+  RealmConfig,
+  RealmEngine,
+  RealmJobResult,
+  RealmJobSpec,
+  RealmSession,
+} from '@theaiinc/realm-core';
+import { EngineType, NetworkMode, RealmState } from '@theaiinc/realm-core';
+import { Storage } from '@google-cloud/storage';
+import { GoogleAuth } from 'google-auth-library';
 
-  type ObjectStore = {
+type ObjectStore = {
     save(name: string, data: Buffer | NodeJS.ReadableStream): Promise<void>;
     load(name: string): Promise<Buffer>;
     list(prefix: string): Promise<string[]>;
