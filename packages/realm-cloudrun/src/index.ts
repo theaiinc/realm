@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import type {
   ActionResult,
   FileRef,
@@ -6,6 +7,7 @@ import type {
   RealmEngine,
   RealmJobResult,
   RealmJobSpec,
+  RealmJobStartResult,
   RealmSession,
 } from '@theaiinc/realm-core';
 import { EngineType, NetworkMode, RealmState } from '@theaiinc/realm-core';

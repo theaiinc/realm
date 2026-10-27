@@ -1,5 +1,12 @@
+import crypto from 'node:crypto';
+import type { Operation } from './types.js';
 import { checkCapability } from './enforcer.js';
-import type { RealmEngine } from './engine.js';
+import type {
+  RealmEngine,
+  RealmJobSpec,
+  RealmJobStartResult,
+  RealmJobResult,
+} from './engine.js';
 import type {
   RealmConfig,
   RealmSession,
@@ -8,7 +15,6 @@ import type {
   EngineType,
   AuditEntry,
   SessionCapability,
-  Operation,
   PermissionEvent,
 } from './types.js';
 
@@ -223,7 +229,7 @@ export class RealmAPI {
   }
 
   /** Capture screenshot from realm */
-  async capture(realmId: string): Promise<Buffer> {
+  async capture(realmId: string): Promise<Uint8Array> {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
 
