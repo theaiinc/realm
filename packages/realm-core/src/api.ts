@@ -476,6 +476,48 @@ export class RealmAPI {
     return fileRef;
   }
 
+  /** Write a file into a realm workspace. */
+  async putFile(realmId: string, path: string, data: Uint8Array | NodeJS.ReadableStream): Promise<{ path: string; size: number }> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.putFile) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support file writes`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.putFile(realmId, path, data);
+    await this.auditLogger.log({
+      action: 'realm.putFile',
+      realmId,
+      detail: `Wrote ${path} in realm: ${realmId}`,
+      success: true,
+    });
+    return result;
+  }
+
+  /** Read a file from a realm workspace. */
+  async getFile(realmId: string, path: string): Promise<Uint8Array> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.getFile) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support file reads`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.getFile(realmId, path);
+    await this.auditLogger.log({
+      action: 'realm.getFile',
+      realmId,
+      detail: `Read ${path} from realm: ${realmId}`,
+      success: true,
+    });
+    return result;
+  }
+
   /** Set mock geolocation, for engines that support it (see RealmEngine.setLocation) */
   async setLocation(realmId: string, latitude: number, longitude: number): Promise<ActionResult> {
     const entry = this.realms.get(realmId);
