@@ -100,11 +100,11 @@ The `cloudrun-job` engine runs each job in a throwaway Cloud Run Job execution w
 | POST   | `/api/v1/realms/:id/exec`    | Execute command      |
 | POST   | `/api/v1/realms/:id/import`  | Import file          |
 | POST   | `/api/v1/realms/:id/export`  | Export file          |
-| POST   | `/api/v1/realms/:id/jobs`    | Start a long-running job |
+| POST   | `/api/v1/realms/:id/jobs`             | Start a long-running job; returns `201 {jobId}` |
 | GET    | `/api/v1/realms/:id/jobs/:jobId?offset=N` | Get job state and incremental logs |
-| DELETE | `/api/v1/realms/:id/jobs/:jobId` | Cancel a running job |
-| PUT    | `/api/v1/realms/:id/files?path=<rel path>` | Upload a realm file (streamed) |
-| GET    | `/api/v1/realms/:id/files?path=<rel path>` | Download a realm file |
+| DELETE | `/api/v1/realms/:id/jobs/:jobId` | Cancel a running job; returns `202` |
+| PUT    | `/api/v1/realms/:id/files?path=<rel path>` | Upload a realm file as a streamed octet body; returns `201 {path, size}` |
+| GET    | `/api/v1/realms/:id/files?path=<rel path>` | Download realm file bytes; returns `404` when absent |
 | GET    | `/api/v1/audit`              | Get audit log        |
 
 ## Security Model
