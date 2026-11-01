@@ -77,7 +77,7 @@ async function installDependencies(): Promise<void> {
     const dir = path.dirname(lock);
     const bytes = await fs.readFile(lock);
     const hash = createHash('sha256').update('runner-v1').update(path.basename(lock)).update(bytes).digest('hex');
-    const cache = path.join(bucketRoot, 'cache', `${hash}.tgz`);
+    const cache = path.join(bucketRoot, 'realms', realmId, 'cache', `${hash}.tgz`);
     try {
       await fs.mkdir(path.join(dir, 'node_modules'), { recursive: true });
       await execFileAsync('tar', ['-xzf', cache, '-C', dir]);
@@ -88,7 +88,7 @@ async function installDependencies(): Promise<void> {
       const [tool, ...args] = lock.endsWith('package-lock.json') || lock.endsWith('npm-shrinkwrap.json')
         ? ['npm', 'ci', '--no-audit', '--no-fund', '--prefer-offline']
         : lock.endsWith('pnpm-lock.yaml') ? ['pnpm', 'install', '--frozen-lockfile'] : ['yarn', 'install', '--frozen-lockfile'];
-      await execFileAsync(tool, args, { cwd: dir, env: { ...process.env, CI: '1' } });
+      await execFileAsync(tool, args, { cwd: dir, env: childEnvironment() });
       await fs.mkdir(path.dirname(cache), { recursive: true });
       await execFileAsync('tar', ['-czf', cache, '-C', dir, 'node_modules']);
     } catch (error) {
@@ -100,8 +100,7 @@ async function main(): Promise<void> {
   await downloadFiles();
   await installDependencies();
   const before = new Map((await walk(root)).map(file => [file, 0]));
-  const env = { ...process.env, CI: '1' };
-  for (const key of ['REALM_ID', 'JOB_ID', 'BUCKET', 'JOB_COMMAND_B64', 'JOB_CWD', 'JOB_TIMEOUT_SECONDS']) delete env[key];
+  const env = childEnvironment();
   const child = spawn('/bin/sh', ['-c', command], { cwd, detached: true, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const append = (data: Buffer) => { logBuffer += data.toString(); };
   child.stdout.on('data', append);
@@ -131,4 +130,24 @@ void main().catch(async error => {
   await fs.mkdir(jobPrefix, { recursive: true });
   await fs.writeFile(path.join(jobPrefix, 'result.json'), JSON.stringify({ exit_code: 1, cancelled, timed_out: timedOut, changed_files: 0, out_bytes: 0, out_skipped: false, runtime_seconds: Math.floor((Date.now() - startedAt) / 1000), error: String(error) }));
 });
+function childEnvironment(): NodeJS.ProcessEnv {
+  const allowed = ['PATH', 'HOME', 'LANG'];
+  const env: NodeJS.ProcessEnv = { CI: '1' };
+  for (const key of allowed) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  const specEnv = process.env.JOB_SPEC_ENV;
+  if (specEnv) {
+    try {
+      const values = JSON.parse(specEnv) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(values)) {
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && typeof value === 'string') env[key] = value;
+      }
+    } catch {
+      log('invalid job environment; ignoring it');
+    }
+  }
+  return env;
+}
+
 function exists(file: string): Promise<boolean> { return fs.access(file).then(() => true, () => false); }
