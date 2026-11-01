@@ -60,6 +60,7 @@ async function downloadFiles(): Promise<void> {
   const files = await walk(filesPrefix).catch(() => []);
   for (const source of files) {
     const relative = path.relative(filesPrefix, source);
+    if (relative === 'out.tgz' || relative.endsWith(`${path.sep}out.tgz`)) continue;
     const destination = path.join(root, relative);
     if (relative.split(path.sep).some(part => part === '..')) throw new Error('unsafe file path');
     await fs.mkdir(path.dirname(destination), { recursive: true });
@@ -72,6 +73,8 @@ async function downloadFiles(): Promise<void> {
   }
 }
 async function installDependencies(): Promise<void> {
+  // Dependency caches are scoped by realm so one tenant can never restore another
+  // tenant's node_modules archive, even if lockfiles are identical.
   const files = await walk(root);
   for (const lock of files.filter(file => /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock)$/.test(file))) {
     const dir = path.dirname(lock);
@@ -99,10 +102,10 @@ async function installDependencies(): Promise<void> {
 async function main(): Promise<void> {
   await downloadFiles();
   await installDependencies();
-  const before = new Map((await walk(root)).map(file => [file, 0]));
+  const before = new Map((await walk(root)).map(file => [file, await fileMtime(file)]));
   const env = childEnvironment();
   const child = spawn('/bin/sh', ['-c', command], { cwd, detached: true, env, stdio: ['ignore', 'pipe', 'pipe'] });
-  const append = (data: Buffer) => { logBuffer += data.toString(); };
+  const append = (data: Buffer) => { logBuffer = logBuffer.concat(data.toString()); };
   child.stdout.on('data', append);
   child.stderr.on('data', append);
   const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid!, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL'); } catch {} }, 10000); }, timeoutSeconds * 1000);
@@ -112,7 +115,12 @@ async function main(): Promise<void> {
   const exitCode = await new Promise<number>(resolve => child.once('close', code => resolve(code ?? 1)));
   clearTimeout(timer); clearInterval(interval); await uploadLog(true);
   const after = await walk(root);
-  const changed = after.filter(file => !file.includes('/node_modules/') && !file.includes('/.git/') && (!before.has(file) || true));
+  const changed = [] as string[];
+  for (const file of after) {
+    if (file === path.join(root, 'out.tgz') || file.endsWith(`${path.sep}out.tgz`) || file.includes(`${path.sep}node_modules${path.sep}`) || file.includes(`${path.sep}.git${path.sep}`)) continue;
+    const mtime = await fileMtime(file);
+    if (!before.has(file) || mtime > (before.get(file) ?? 0)) changed.push(file);
+  }
   const out = path.join(root, 'out.tgz');
   let outBytes = 0; let outSkipped = false;
   if (changed.length) {
@@ -148,6 +156,10 @@ function childEnvironment(): NodeJS.ProcessEnv {
     }
   }
   return env;
+}
+
+async function fileMtime(file: string): Promise<number> {
+  return (await fs.stat(file)).mtimeMs;
 }
 
 function exists(file: string): Promise<boolean> { return fs.access(file).then(() => true, () => false); }

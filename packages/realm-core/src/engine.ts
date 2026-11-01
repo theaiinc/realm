@@ -96,10 +96,10 @@ export interface RealmEngine {
   listFiles(realmId: string, path: string): Promise<FileRef[]>;
 
   /** Write a file into the realm workspace, if supported by this engine. */
-  putFile(realmId: string, path: string, data: Uint8Array | NodeJS.ReadableStream): Promise<{ path: string; size: number }>;
+  putFile?(realmId: string, path: string, data: Uint8Array | NodeJS.ReadableStream): Promise<{ path: string; size: number }>;
 
   /** Read a file from the realm workspace, if supported by this engine. */
-  getFile(realmId: string, path: string): Promise<Uint8Array>;
+  getFile?(realmId: string, path: string): Promise<Uint8Array>;
 
   /** Set network mode for the realm */
   setNetworkMode(realmId: string, mode: NetworkMode, allowedDomains?: string[]): Promise<void>;

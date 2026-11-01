@@ -63,8 +63,14 @@ type ObjectStore = {
   export class CloudRunEngine implements RealmEngine {
     readonly type = EngineType.CloudRunJob;
     private readonly store: ObjectStore;
+    private readonly project: string;
+    private readonly region: string;
+    private readonly job: string;
+    private readonly bucketName: string;
     private readonly run: RunClient;
     private readonly executions = new Map<string, string>();
+    private readonly activeJobs = new Set<string>();
+    private readonly usage = new Map<string, { day: string; seconds: number }>();
     private readonly started = Date.now();
 
     constructor(options: CloudRunEngineOptions = {}) {
@@ -75,6 +81,10 @@ type ObjectStore = {
       if (!project || !region || !job || !bucketName) {
         throw new Error('REALM_CLOUDRUN_PROJECT, REGION, JOB and BUCKET are required');
       }
+      this.project = project;
+      this.region = region;
+      this.job = job;
+      this.bucketName = bucketName;
       this.store = options.store ?? new GcsStore(new Storage({ projectId: project }).bucket(bucketName));
       this.run = options.run ?? this.createRunClient(project, region, job);
     }
@@ -113,7 +123,13 @@ type ObjectStore = {
         return { path: name.replace(`realms/${realmId}/files/`, ''), name: value, sizeBytes: data.length };
       }));
     }
-    async setNetworkMode(_realmId: string, _mode: NetworkMode) {}
+    async setNetworkMode(realmId: string, mode: NetworkMode) {
+      if (mode === NetworkMode.None) {
+        await this.store.save(`realms/${realmId}/network-policy.json`, Buffer.from(JSON.stringify({ mode: 'none', blocked: ['169.254.169.254', 'metadata.google.internal'] })));
+      } else {
+        await this.store.save(`realms/${realmId}/network-policy.json`, Buffer.from(JSON.stringify({ mode })));
+      }
+    }
     async putFile(realmId: string, path: string, data: Buffer | NodeJS.ReadableStream) {
       const safe = this.safePath(path);
       await this.store.save(`realms/${realmId}/files/${safe}`, data);
@@ -124,14 +140,33 @@ type ObjectStore = {
       return await this.store.load(`realms/${realmId}/files/${this.safePath(path)}`);
     }
     async startJob(realmId: string, spec: RealmJobSpec) {
+      if (this.activeJobs.has(realmId)) throw new Error('realm already has an active job');
+      const timeoutSec = Math.min(Math.max(1, spec.timeoutSec ?? 21600), 21600);
+      const day = new Date().toISOString().slice(0, 10);
+      const usage = this.usage.get(realmId);
+      const used = usage?.day === day ? usage.seconds : 0;
+      if (used + timeoutSec > 21600) throw new Error('realm daily runtime quota exceeded');
+      this.activeJobs.add(realmId);
+      this.usage.set(realmId, { day, seconds: used + timeoutSec });
       const jobId = randomUUID();
       const execution = await this.run.runJob({
-        realmId,
-        jobId,
-        command: Buffer.from(spec.command).toString('base64'),
-        cwd: spec.cwd ?? '/work',
-        timeoutSeconds: Math.min(spec.timeoutSec ?? 21600, 21600),
-        env: spec.env ?? {}
+        name: `projects/${this.project}/locations/${this.region}/jobs/${this.job}`,
+        overrides: {
+          taskCount: 1,
+          containerOverrides: [{
+            env: [
+              { name: 'REALM_ID', value: realmId },
+              { name: 'JOB_ID', value: jobId },
+              { name: 'BUCKET', value: this.bucketName },
+              { name: 'JOB_COMMAND_B64', value: Buffer.from(spec.command).toString('base64') },
+              { name: 'JOB_CWD', value: spec.cwd ?? '/work' },
+              { name: 'JOB_TIMEOUT_SECONDS', value: String(timeoutSec) },
+              { name: 'JOB_SPEC_ENV', value: JSON.stringify(spec.env ?? {}) },
+              { name: 'REALM_PREFIX', value: `realms/${realmId}/` },
+              { name: 'NETWORK_POLICY', value: 'metadata-deny,egress-allowlist' },
+            ],
+          }],
+        },
       });
       const name = (execution as any).name ?? String(execution);
       await this.store.save(`realms/${realmId}/jobs/${jobId}/execution`, Buffer.from(name));
@@ -142,7 +177,10 @@ type ObjectStore = {
       const offset = Math.max(0, options.logOffset ?? 0);
       const prefix = `realms/${realmId}/jobs/${jobId}/log/`;
       const logs = (await this.store.list(prefix)).sort((a, b) => a.localeCompare(b));
-      const all = Buffer.concat(await Promise.all(logs.map(name => this.store.load(name))));
+      let all = Buffer.alloc(0);
+      for (const name of logs) {
+        all = Buffer.concat([all, await this.store.load(name)]);
+      }
       let state: RealmJobResult['state'] = 'queued';
       let result: any;
       try {
@@ -155,15 +193,19 @@ type ObjectStore = {
           const condition = execution?.status?.conditions?.find((entry: any) => entry.type === 'Completed' || entry.type === 'Succeeded');
           const ended = Boolean(execution?.completionTime || execution?.status?.completionTime || condition?.status === 'False');
           state = ended ? 'failed' : execution?.runningCount || execution?.status?.runningCount ? 'running' : 'queued';
-          if (ended && condition?.message) all.write(`[runner] ${condition.message}\n`);
+          if (ended && condition?.message) all = Buffer.concat([all, Buffer.from(`[runner] ${condition.message}\n`)]);
         } catch {}
       }
       const nextOffset = all.length;
+      if (result && (result.state === 'succeeded' || result.state === 'failed' || result.state === 'cancelled' || result.state === 'timed_out')) {
+        this.activeJobs.delete(realmId);
+      }
       return { state, exitCode: result?.exit_code, log: all.subarray(Math.min(offset, all.length)).toString(), nextOffset, runtimeSec: result?.runtime_seconds, filesChanged: result?.changed_files };
     }
     async cancelJob(realmId: string, jobId: string) {
       const name = this.executions.get(`${realmId}/${jobId}`) ?? (await this.store.load(`realms/${realmId}/jobs/${jobId}/execution`)).toString();
       await this.run.cancelExecution(name);
+      this.activeJobs.delete(realmId);
     }
     private safePath(path: string) {
       const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
@@ -176,7 +218,7 @@ type ObjectStore = {
       return {
         async runJob(request) {
           const client: any = await auth.getClient();
-          const url = `https://${region}-run.googleapis.com/apis/run.googleapis.com/v1/projects/${project}/locations/${region}/jobs/${job}:run`;
+          const url = `https://run.googleapis.com/v1/projects/${project}/locations/${region}/jobs/${job}:run`;
           const response = await client.request({ url, method: 'POST', data: request });
           return response.data;
         },

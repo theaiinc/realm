@@ -340,19 +340,20 @@ export async function createServer(options?: RealmServerOptions) {
         return reply.status(400).send({ error: 'path must be a relative path without ..' });
       }
       let size = 0;
-      const chunks: Buffer[] = [];
-      try {
+      const limitedStream = async function* () {
         for await (const chunk of request.raw) {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           size += buffer.length;
           if (size > 500 * 1024 * 1024) {
-            return reply.status(413).send({ error: 'file exceeds 500 MB limit' });
+            throw new Error('file exceeds 500 MB limit');
           }
-          chunks.push(buffer);
+          yield buffer;
         }
-        const result = await api.putFile(request.params.id, filePath, Buffer.concat(chunks));
+      }();
+      try {
+        const result = await api.putFile(request.params.id, filePath, limitedStream);
         return reply.status(201).send(result);
-      } catch (error) {
+      } catch (error) 
         return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) });
       }
     },
