@@ -121,7 +121,7 @@ async function main(): Promise<void> {
     const mtime = await fileMtime(file);
     if (!before.has(file) || mtime > (before.get(file) ?? 0)) changed.push(file);
   }
-  const out = path.join(root, 'out.tgz');
+  const out = path.join('/tmp', `realm-${jobId}-out.tgz`);
   let outBytes = 0; let outSkipped = false;
   if (changed.length) {
     await execFileAsync('tar', ['-czf', out, '-C', root, ...changed.map(file => path.relative(root, file))]);

@@ -7,6 +7,7 @@ import { BrowserEngine } from '@theaiinc/realm-browser';
 import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
 import { HostEngine } from '@theaiinc/realm-host';
 import { DockerSandboxEngine } from '@theaiinc/realm-sandbox';
+import { CloudRunEngine } from '@theaiinc/realm-cloudrun';
 import { VeilPipeline } from '@theaiinc/realm-veil';
 import { isAuthorized, isPublicPath, resolveApiToken, resolveEngineTypes } from './auth.js';
 
@@ -49,6 +50,11 @@ export async function createServer(options?: RealmServerOptions) {
   if (process.env.ENABLE_DOCKER_SANDBOX_ENGINE === 'true') {
     api.registerEngine(new DockerSandboxEngine());
     console.warn('[realm-api] ENABLE_DOCKER_SANDBOX_ENGINE=true — DockerSandboxEngine registered (sbx CLI; cloud sandboxes bill per second)');
+  }
+
+  if (process.env.ENABLE_CLOUDRUN_ENGINE === 'true') {
+    api.registerEngine(new CloudRunEngine());
+    console.warn('[realm-api] ENABLE_CLOUDRUN_ENGINE=true — CloudRunEngine registered (Cloud Run Job execution)');
   }
 
   const app = Fastify({ logger: true });
@@ -353,7 +359,7 @@ export async function createServer(options?: RealmServerOptions) {
       try {
         const result = await api.putFile(request.params.id, filePath, limitedStream);
         return reply.status(201).send(result);
-      } catch (error) 
+      } catch (error) {
         return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) });
       }
     },

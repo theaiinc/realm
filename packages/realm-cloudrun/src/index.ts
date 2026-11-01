@@ -124,7 +124,7 @@ type ObjectStore = {
       }));
     }
     async setNetworkMode(realmId: string, mode: NetworkMode) {
-      if (mode === NetworkMode.None) {
+      if (mode === NetworkMode.Disabled) {
         await this.store.save(`realms/${realmId}/network-policy.json`, Buffer.from(JSON.stringify({ mode: 'none', blocked: ['169.254.169.254', 'metadata.google.internal'] })));
       } else {
         await this.store.save(`realms/${realmId}/network-policy.json`, Buffer.from(JSON.stringify({ mode })));
