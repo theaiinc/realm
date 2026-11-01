@@ -102,7 +102,8 @@ async function installDependencies(): Promise<void> {
 async function main(): Promise<void> {
   await downloadFiles();
   await installDependencies();
-  const before = new Map((await walk(root)).map(file => [file, await fileMtime(file)]));
+  const before = new Map<string, number>();
+  for (const file of await walk(root)) before.set(file, await fileMtime(file));
   const env = childEnvironment();
   const child = spawn('/bin/sh', ['-c', command], { cwd, detached: true, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const append = (data: Buffer) => { logBuffer = logBuffer.concat(data.toString()); };
@@ -138,7 +139,7 @@ void main().catch(async error => {
   await fs.mkdir(jobPrefix, { recursive: true });
   await fs.writeFile(path.join(jobPrefix, 'result.json'), JSON.stringify({ exit_code: 1, cancelled, timed_out: timedOut, changed_files: 0, out_bytes: 0, out_skipped: false, runtime_seconds: Math.floor((Date.now() - startedAt) / 1000), error: String(error) }));
 });
-function childEnvironment(): NodeJS.ProcessEnv {
+export function childEnvironment(): NodeJS.ProcessEnv {
   const allowed = ['PATH', 'HOME', 'LANG'];
   const env: NodeJS.ProcessEnv = { CI: '1' };
   for (const key of allowed) {
