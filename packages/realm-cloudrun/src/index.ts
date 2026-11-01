@@ -194,10 +194,12 @@ type ObjectStore = {
           const ended = Boolean(execution?.completionTime || execution?.status?.completionTime || condition?.status === 'False');
           state = ended ? 'failed' : execution?.runningCount || execution?.status?.runningCount ? 'running' : 'queued';
           if (ended && condition?.message) all = Buffer.concat([all, Buffer.from(`[runner] ${condition.message}\n`)]);
-        } catch {}
+        } catch (error) {
+          void error;
+        }
       }
       const nextOffset = all.length;
-      if (result && (result.state === 'succeeded' || result.state === 'failed' || result.state === 'cancelled' || result.state === 'timed_out')) {
+      if (result && (result.timed_out || result.cancelled || result.exit_code !== undefined)) {
         this.activeJobs.delete(realmId);
       }
       return { state, exitCode: result?.exit_code, log: all.subarray(Math.min(offset, all.length)).toString(), nextOffset, runtimeSec: result?.runtime_seconds, filesChanged: result?.changed_files };

@@ -26,6 +26,9 @@ importers:
       '@theaiinc/realm-browser':
         specifier: workspace:*
         version: link:../realm-browser
+      '@theaiinc/realm-cloudrun':
+        specifier: workspace:*
+        version: link:../realm-cloudrun
       '@theaiinc/realm-container':
         specifier: workspace:*
         version: link:../realm-container

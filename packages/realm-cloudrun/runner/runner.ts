@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
-import { promises as fs, createReadStream } from 'node:fs';
-import { createWriteStream } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -86,7 +85,9 @@ async function installDependencies(): Promise<void> {
       await execFileAsync('tar', ['-xzf', cache, '-C', dir]);
       log(`restored dependency cache for ${path.relative(root, dir)}`);
       continue;
-    } catch {}
+    } catch (error) {
+      void error;
+    }
     try {
       const [tool, ...args] = lock.endsWith('package-lock.json') || lock.endsWith('npm-shrinkwrap.json')
         ? ['npm', 'ci', '--no-audit', '--no-fund', '--prefer-offline']
@@ -109,9 +110,30 @@ async function main(): Promise<void> {
   const append = (data: Buffer) => { logBuffer = logBuffer.concat(data.toString()); };
   child.stdout.on('data', append);
   child.stderr.on('data', append);
-  const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid!, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL'); } catch {} }, 10000); }, timeoutSeconds * 1000);
+  const timer = setTimeout(() => {
+    timedOut = true;
+    try {
+      process.kill(-child.pid!, 'SIGTERM');
+    } catch (error) {
+      void error;
+    }
+    setTimeout(() => {
+      try {
+        process.kill(-child.pid!, 'SIGKILL');
+      } catch (error) {
+        void error;
+      }
+    }, 10000);
+  }, timeoutSeconds * 1000);
   const interval = setInterval(() => { void uploadLog(); }, 5000);
-  const term = () => { cancelled = true; try { process.kill(-child.pid!, 'SIGTERM'); } catch {} };
+  const term = () => {
+    cancelled = true;
+    try {
+      process.kill(-child.pid!, 'SIGTERM');
+    } catch (error) {
+      void error;
+    }
+  };
   process.once('SIGTERM', term);
   const exitCode = await new Promise<number>(resolve => child.once('close', code => resolve(code ?? 1)));
   clearTimeout(timer); clearInterval(interval); await uploadLog(true);
