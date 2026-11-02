@@ -152,9 +152,6 @@ importers:
         specifier: ^9.15.0
         version: 9.15.1(supports-color@10.2.2)
     devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.5
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(postcss@8.5.15)(supports-color@10.2.2)(typescript@5.9.3)
@@ -296,8 +293,8 @@ importers:
         version: 0.1.1
     devDependencies:
       '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.5
+        specifier: ^20.0.0
+        version: 20.19.43
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(postcss@8.5.15)(supports-color@10.2.2)(typescript@5.9.3)
@@ -306,7 +303,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.2.0
-        version: 3.2.6(@types/node@22.20.5)(supports-color@10.2.2)
+        version: 3.2.6(@types/node@20.19.43)(supports-color@10.2.2)
 
 packages:
 
