@@ -20,7 +20,7 @@ export class RealmContainer extends Container<Env> {
   // enough to survive a working session, short enough not to bill all night.
   sleepAfter = '30m';
 
-  constructor(ctx: DurableObjectState<{}>, env: Env) {
+  constructor(ctx: DurableObjectState<Record<string, never>>, env: Env) {
     super(ctx, env);
     if (env.REALM_SLEEP_AFTER?.trim()) this.sleepAfter = env.REALM_SLEEP_AFTER.trim();
     this.envVars = {
