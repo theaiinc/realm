@@ -15,6 +15,7 @@ describe('runner child environment', () => {
       HOME: process.env.HOME,
       LANG: process.env.LANG,
       JOB_SPEC_ENV: process.env.JOB_SPEC_ENV,
+      BUCKET_DIR: process.env.BUCKET_DIR,
     };
 
     process.env.REALM_ID = 'realm-test';
@@ -29,6 +30,7 @@ describe('runner child environment', () => {
     process.env.HOME = '/safe/home';
     process.env.LANG = 'C.UTF-8';
     process.env.JOB_SPEC_ENV = JSON.stringify({ PUBLIC_FLAG: 'yes' });
+    process.env.BUCKET_DIR = '/tmp/realm-runner-test-bucket';
 
     try {
       const { childEnvironment } = await import('./runner.js');
