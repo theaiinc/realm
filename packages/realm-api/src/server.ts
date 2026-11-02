@@ -7,6 +7,7 @@ import { BrowserEngine } from '@theaiinc/realm-browser';
 import { UbuntuEngine } from '@theaiinc/realm-ubuntu';
 import { HostEngine } from '@theaiinc/realm-host';
 import { DockerSandboxEngine } from '@theaiinc/realm-sandbox';
+import { CloudRunEngine } from '@theaiinc/realm-cloudrun';
 import { VeilPipeline } from '@theaiinc/realm-veil';
 import { isAuthorized, isPublicPath, resolveApiToken, resolveEngineTypes } from './auth.js';
 
@@ -49,6 +50,11 @@ export async function createServer(options?: RealmServerOptions) {
   if (process.env.ENABLE_DOCKER_SANDBOX_ENGINE === 'true') {
     api.registerEngine(new DockerSandboxEngine());
     console.warn('[realm-api] ENABLE_DOCKER_SANDBOX_ENGINE=true — DockerSandboxEngine registered (sbx CLI; cloud sandboxes bill per second)');
+  }
+
+  if (process.env.ENABLE_CLOUDRUN_ENGINE === 'true') {
+    api.registerEngine(new CloudRunEngine());
+    console.warn('[realm-api] ENABLE_CLOUDRUN_ENGINE=true — CloudRunEngine registered (Cloud Run Job execution)');
   }
 
   const app = Fastify({ logger: true });
@@ -282,6 +288,97 @@ export async function createServer(options?: RealmServerOptions) {
         return reply.status(400).send({
           error: error instanceof Error ? error.message : String(error),
         });
+      }
+    },
+  );
+
+  // Long-running jobs
+  app.post<{
+    Params: { id: string };
+    Body: { command: string; cwd?: string; timeoutSec?: number; env?: Record<string, string> };
+  }>('/api/v1/realms/:id/jobs', async (request, reply) => {
+    try {
+      const result = await api.startJob(request.params.id, request.body);
+      return reply.status(201).send(result);
+    } catch (error) {
+      return reply.status(400).send({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get<{
+    Params: { id: string; jobId: string };
+    Querystring: { offset?: string };
+  }>('/api/v1/realms/:id/jobs/:jobId', async (request, reply) => {
+    try {
+      const result = await api.getJob(request.params.id, request.params.jobId, {
+        logOffset: request.query.offset === undefined ? undefined : Number(request.query.offset),
+      });
+      return result;
+    } catch (error) {
+      return reply.status(400).send({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete<{ Params: { id: string; jobId: string } }>(
+    '/api/v1/realms/:id/jobs/:jobId',
+    async (request, reply) => {
+      try {
+        await api.cancelJob(request.params.id, request.params.jobId);
+        return reply.status(202).send();
+      } catch (error) {
+        return reply.status(400).send({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Workspace files
+  app.put<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/v1/realms/:id/files',
+    async (request, reply) => {
+      const filePath = request.query.path;
+      if (!filePath || filePath.startsWith('/') || filePath.split(/[\\/]/).includes('..')) {
+        return reply.status(400).send({ error: 'path must be a relative path without ..' });
+      }
+      let size = 0;
+      const limitedStream = async function* () {
+        for await (const chunk of request.raw) {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          size += buffer.length;
+          if (size > 500 * 1024 * 1024) {
+            throw new Error('file exceeds 500 MB limit');
+          }
+          yield buffer;
+        }
+      }();
+      try {
+        const result = await api.putFile(request.params.id, filePath, limitedStream);
+        return reply.status(201).send(result);
+      } catch (error) {
+        return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { path?: string } }>(
+    '/api/v1/realms/:id/files',
+    async (request, reply) => {
+      const filePath = request.query.path;
+      if (!filePath || filePath.startsWith('/') || filePath.split(/[\\/]/).includes('..')) {
+        return reply.status(400).send({ error: 'path must be a relative path without ..' });
+      }
+      try {
+        const data = await api.getFile(request.params.id, filePath);
+        reply.type('application/octet-stream');
+        return reply.send(data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return reply.status(message.includes('not found') ? 404 : 400).send({ error: message });
       }
     },
   );
