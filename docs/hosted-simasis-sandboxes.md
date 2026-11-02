@@ -4,7 +4,7 @@ Status: design for review only. No Cloudflare resources, paid services, secrets,
 
 ## Decision
 
-Hosted Simasis will execute Terminal sessions and agent commands in a dedicated Realm sandbox for each Simasis user, rather than in the shared dev-agent container. The first implementation target is Cloudflare account `32351d590fd6134e6c2328cc976952f7`, using the existing `@theaiinc/realm-cloudflare` Worker and Container/Durable Object pattern.
+Hosted Simasis will execute Terminal sessions and agent commands in a dedicated Realm sandbox for each Simasis user, rather than in the shared dev-agent container. This design is hosted-only: Simasis Desktop continues running locally and is not changed by this work. The first implementation target is Cloudflare account `32351d590fd6134e6c2328cc976952f7`, using the existing `@theaiinc/realm-cloudflare` Worker and Container/Durable Object pattern.
 
 A sandbox is addressed by an opaque Realm/user identifier, never by an account-wide shared workspace. It contains only that user's project files. Hosted workspace files are synchronized into the sandbox before use and changed files are synchronized back through an explicit, audited operation. A future mounted/object-backed implementation may replace synchronization, but must preserve the same boundary.
 
@@ -44,12 +44,12 @@ Initial policy defaults:
 |---|---:|---|
 | CPU | 1 vCPU burst, configurable ceiling | Cloudflare container/resource setting |
 | Memory | 2 GiB | container limit; terminate on breach |
-| Disk | 10 GiB workspace plus bounded temporary space | quota before sync and during writes |
+| Disk | Per-plan configured workspace plus bounded temporary space; 10 GiB for unknown/free plans | quota before sync and during writes |
 | Processes | 128 total, 32 per session/process tree | PID/cgroup/container policy |
 | Idle shutdown | 15 minutes without terminal/exec activity | Realm lifecycle timer |
 | Maximum PTY session | 2 hours | forced TERM then KILL |
-| Maximum one-shot exec | 6 hours, lower default for agent calls | execution timeout |
-| Daily compute | 60 CPU-minutes per user initially | Simasis/Realm quota ledger |
+| Maximum one-shot exec | Per-plan configured limit; 6 hours for unknown/free plans | execution timeout |
+| Daily compute | Per-plan quota from configuration; 60 CPU-minutes for unknown/free plans | Simasis/Realm quota ledger |
 | Concurrent terminals | 1 per user | durable per-user session lock |
 | Concurrent execs | 1 while PTY is active; otherwise 1 | per-user scheduler |
 
@@ -71,7 +71,7 @@ The initial allowlist must be narrow and versioned. Adding a host requires produ
 
 Secrets never enter the sandbox. Hosted Realm configuration contains references such as `arcana://github/simasis-user-token`, never secret values. This replaces the hosted `SANDBOX_SECRETS` path that depends on Docker's global secret store and the Mac Arcana CLI.
 
-Required Arcana interface (to be agreed with the Arcana project):
+Required Arcana interface (to be agreed with the Arcana project) is documented separately in `docs/arcana-broker-contract.md`. Steps 2–3 define and test only Realm-side interfaces against a deterministic fake broker; they do not depend on a live Arcana service:
 
 ```text
 POST /v1/egress/authorize
@@ -134,7 +134,7 @@ A cost model must use measured session duration, CPU/memory allocation, storage 
 
 ## Delivery sequence
 
-1. Approve this design and reconcile the Arcana contract.
+1. Approve this design and reconcile the Arcana contract. Simasis Desktop remains local and is explicitly outside this hosted delivery sequence.
 2. Add core PTY/exec interfaces, policy types, audit events, and tests without deployment.
 3. Implement a local/fake Cloudflare adapter and folder-backed PTY tests.
 4. Implement per-user Cloudflare lifecycle, egress enforcement, quotas, and durable metadata.

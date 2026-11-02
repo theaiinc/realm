@@ -52,6 +52,13 @@ export { RealmRegistrationClient } from './registration-client.js';
 export type { RealmRegistrationClientConfig } from './registration-client.js';
 
 export type { RealmFilesystem, PermissionChecker } from './filesystem.js';
+
+export type {
+  PlanId, PlanLimits, PlanLimitsMap, PtyOpenRequest, PtySession, PtyOutput, PtyAdapter,
+  ExecRequest, ExecState, ExecAdapter, HostedAuditAction, HostedAuditEvent, AuditSink,
+  EgressAuthorizeRequest, EgressDecision, Broker,
+} from './hosted-sandbox.js';
+export { FREE_PLAN_LIMITS, limitsForPlan, DeterministicFakeBroker } from './hosted-sandbox.js';
 export {
   defaultPermissionChecker,
   strictPermissionChecker,
