@@ -1,5 +1,12 @@
+import crypto from 'node:crypto';
+import type { Operation } from './types.js';
 import { checkCapability } from './enforcer.js';
-import type { RealmEngine } from './engine.js';
+import type {
+  RealmEngine,
+  RealmJobSpec,
+  RealmJobStartResult,
+  RealmJobResult,
+} from './engine.js';
 import type {
   RealmConfig,
   RealmSession,
@@ -8,7 +15,6 @@ import type {
   EngineType,
   AuditEntry,
   SessionCapability,
-  Operation,
   PermissionEvent,
 } from './types.js';
 
@@ -223,7 +229,7 @@ export class RealmAPI {
   }
 
   /** Capture screenshot from realm */
-  async capture(realmId: string): Promise<Buffer> {
+  async capture(realmId: string): Promise<Uint8Array> {
     const entry = this.realms.get(realmId);
     if (!entry) throw new RealmNotFoundError(realmId);
 
@@ -367,6 +373,71 @@ export class RealmAPI {
     return result;
   }
 
+  /** Start a long-running job on an engine that supports jobs. */
+  async startJob(realmId: string, spec: RealmJobSpec): Promise<RealmJobStartResult> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    this.enforceCapability(entry.session, 'execute', realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.startJob) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support jobs`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.startJob(realmId, spec);
+    await this.auditLogger.log({
+      action: 'realm.startJob',
+      detail: `Started job ${result.jobId} in realm: ${realmId}`,
+      success: true,
+    });
+    return result;
+  }
+
+  /** Retrieve a long-running job and incremental logs. */
+  async getJob(realmId: string, jobId: string, options?: { logOffset?: number }): Promise<RealmJobResult> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    this.enforceCapability(entry.session, 'execute', realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.getJob) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support jobs`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.getJob(realmId, jobId, options);
+    await this.auditLogger.log({
+      action: 'realm.getJob',
+      detail: `Retrieved job ${jobId} in realm: ${realmId}`,
+      success: true,
+    });
+    return result;
+  }
+
+  /** Cancel a long-running job. */
+  async cancelJob(realmId: string, jobId: string): Promise<void> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    this.enforceCapability(entry.session, 'execute', realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.cancelJob) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support jobs`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    await engine.cancelJob(realmId, jobId);
+    await this.auditLogger.log({
+      action: 'realm.cancelJob',
+      detail: `Cancelled job ${jobId} in realm: ${realmId}`,
+      success: true,
+    });
+  }
+
   /** Import a file */
   async importFile(realmId: string, sourcePath: string, destPath: string): Promise<FileRef> {
     const entry = this.realms.get(realmId);
@@ -403,6 +474,48 @@ export class RealmAPI {
     });
 
     return fileRef;
+  }
+
+  /** Write a file into a realm workspace. */
+  async putFile(realmId: string, path: string, data: Uint8Array | NodeJS.ReadableStream): Promise<{ path: string; size: number }> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.putFile) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support file writes`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.putFile(realmId, path, data);
+    await this.auditLogger.log({
+      action: 'realm.putFile',
+      realmId,
+      detail: `Wrote ${path} in realm: ${realmId}`,
+      success: true,
+    });
+    return result;
+  }
+
+  /** Read a file from a realm workspace. */
+  async getFile(realmId: string, path: string): Promise<Uint8Array> {
+    const entry = this.realms.get(realmId);
+    if (!entry) throw new RealmNotFoundError(realmId);
+
+    const engine = this.engines.get(entry.realm.engine);
+    if (!engine) throw new EngineNotSupportedError(entry.realm.engine);
+    if (!engine.getFile) {
+      throw new RealmError(`Engine "${entry.realm.engine}" does not support file reads`, 'OPERATION_NOT_SUPPORTED_BY_ENGINE', { engine: entry.realm.engine });
+    }
+
+    const result = await engine.getFile(realmId, path);
+    await this.auditLogger.log({
+      action: 'realm.getFile',
+      realmId,
+      detail: `Read ${path} from realm: ${realmId}`,
+      success: true,
+    });
+    return result;
   }
 
   /** Set mock geolocation, for engines that support it (see RealmEngine.setLocation) */
@@ -448,6 +561,7 @@ export class RealmAPI {
 
     return result;
   }
+
 
   /** List realms */
   listRealms(): Array<{ id: string; config: RealmConfig; session?: RealmSession }> {
