@@ -85,6 +85,8 @@ The `cloudrun-job` engine runs each job in a throwaway Cloud Run Job execution w
 
 Cloud Run jobs do not enforce per-realm network egress policy: configuring VPC egress and any metadata-deny or allowlist rules is an infrastructure concern and is out of scope for this engine. The daily runtime quota is currently tracked per `realm-api` engine instance and is best-effort; it resets when that instance restarts and is not shared across instances.
 
+The Cloud Run job's own service account must have no storage role. The runner receives only a realm-scoped downscoped token, and that token is the sole permitted path to storage. The service account must not be usable as an alternate storage-access path.
+
 ## API Endpoints
 
 | Method | Path                         | Description          |
