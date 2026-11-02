@@ -56,9 +56,12 @@ export type { RealmFilesystem, PermissionChecker } from './filesystem.js';
 export type {
   PlanId, PlanLimits, PlanLimitsMap, PtyOpenRequest, PtySession, PtyOutput, PtyAdapter,
   ExecRequest, ExecState, ExecAdapter, HostedAuditAction, HostedAuditEvent, AuditSink,
-  EgressAuthorizeRequest, EgressDecision, Broker,
+  EgressAuthorizeRequest, EgressDecision, Broker, EgressRule, EgressPolicy,
+  EgressCheckRequest, EgressCheckResult, ResourceLimits,
 } from './hosted-sandbox.js';
-export { FREE_PLAN_LIMITS, limitsForPlan, DeterministicFakeBroker } from './hosted-sandbox.js';
+export {
+  FREE_PLAN_LIMITS, limitsForPlan, DeterministicFakeBroker, checkEgress, validateExecEnv,
+} from './hosted-sandbox.js';
 export {
   defaultPermissionChecker,
   strictPermissionChecker,
