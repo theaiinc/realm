@@ -15,6 +15,8 @@ const timeoutSeconds = Math.min(Number(process.env.JOB_TIMEOUT_SECONDS || 21600)
 const filesPrefix = path.join(bucketRoot, 'realms', realmId, 'files');
 const jobPrefix = path.join(bucketRoot, 'realms', realmId, 'jobs', jobId);
 const logPrefix = path.join(jobPrefix, 'log');
+// Storage credentials, when supplied by the control plane, are intentionally
+// consumed by the runner's storage adapter and never copied to child env.
 const startedAt = Date.now();
 let cancelled = false;
 let timedOut = false;
@@ -106,7 +108,17 @@ async function main(): Promise<void> {
   const before = new Map<string, number>();
   for (const file of await walk(root)) before.set(file, await fileMtime(file));
   const env = childEnvironment();
-  const child = spawn('/bin/sh', ['-c', command], { cwd, detached: true, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // The runner retains REALM_STORAGE_TOKEN for its storage adapter, but never
+  // forwards it to user code. Commands run as the image's unprivileged nobody
+  // account; the image must provide this account and writable /work.
+  const child = spawn('/bin/sh', ['-c', command], {
+    cwd,
+    detached: true,
+    env,
+    uid: 65534,
+    gid: 65534,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
   const append = (data: Buffer) => { logBuffer = logBuffer.concat(data.toString()); };
   child.stdout.on('data', append);
   child.stderr.on('data', append);

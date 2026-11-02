@@ -83,6 +83,8 @@ pnpm realm destroy <realm-id>
 
 The `cloudrun-job` engine runs each job in a throwaway Cloud Run Job execution while storing realm files, logs, and results in GCS. Deploy `realm-api` with the Cloud Run engine as a container next to Simasis on the GCE VM. Set `ENABLE_CLOUDRUN_ENGINE=true` and `REALM_STATE_DIR` to a persistent volume; the API should be reachable only on the host's network.
 
+Cloud Run jobs do not enforce per-realm network egress policy: configuring VPC egress and any metadata-deny or allowlist rules is an infrastructure concern and is out of scope for this engine. The daily runtime quota is currently tracked per `realm-api` engine instance and is best-effort; it resets when that instance restarts and is not shared across instances.
+
 ## API Endpoints
 
 | Method | Path                         | Description          |

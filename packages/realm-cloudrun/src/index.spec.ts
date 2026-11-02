@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CloudRunEngine } from './index.js';
+import { CloudRunEngine, createRealmAccessBoundary } from './index.js';
 
 class MemoryStore {
   values = new Map<string, Buffer>();
@@ -25,6 +25,14 @@ class MemoryStore {
 }
 
 describe('CloudRunEngine', () => {
+  it('builds a CAB for exactly one realm prefix', () => {
+    const boundary = createRealmAccessBoundary('bucket', 'realm-a');
+    const rule = boundary.accessBoundary.accessBoundaryRules[0];
+    expect(rule.availableResource).toBe('//storage.googleapis.com/projects/_/buckets/bucket');
+    expect(rule.availablePermissions).toEqual(['inRole:roles/storage.objectAdmin']);
+    expect(rule.availabilityCondition.expression).toBe("resource.name.startsWith('projects/_/buckets/bucket/objects/realms/realm-a/')");
+    expect(rule.availabilityCondition.expression).not.toContain('realm-b');
+  });
   it('sends tenant-scoped environment through containerOverrides', async () => {
     const store = new MemoryStore();
     let request: any;
@@ -34,6 +42,7 @@ describe('CloudRunEngine', () => {
       job: 'runner',
       bucket: 'bucket',
       store,
+      storageToken: async (realmId) => `token-${realmId}`,
       run: {
         async runJob(value) { request = value; return { name: 'execution-1' }; },
         async getExecution() { return {}; },
@@ -60,6 +69,7 @@ describe('CloudRunEngine', () => {
       job: 'runner',
       bucket: 'bucket',
       store,
+      storageToken: async () => 'token-realm-a',
       run: {
         async runJob() { return { name: 'execution-1' }; },
         async getExecution() { return {}; },

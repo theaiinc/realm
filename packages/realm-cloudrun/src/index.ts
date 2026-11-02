@@ -11,7 +11,7 @@ import type {
 } from '@theaiinc/realm-core';
 import { EngineType, NetworkMode, RealmState } from '@theaiinc/realm-core';
 import { Storage } from '@google-cloud/storage';
-import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth, DownscopedClient } from 'google-auth-library';
 
 type ObjectStore = {
     save(name: string, data: Buffer | NodeJS.ReadableStream): Promise<void>;
@@ -58,6 +58,7 @@ type ObjectStore = {
     bucket?: string;
     store?: ObjectStore;
     run?: RunClient;
+    storageToken?: (realmId: string) => Promise<string>;
   }
 
   export class CloudRunEngine implements RealmEngine {
@@ -68,8 +69,11 @@ type ObjectStore = {
     private readonly job: string;
     private readonly bucketName: string;
     private readonly run: RunClient;
+    private readonly storageToken?: (realmId: string) => Promise<string>;
     private readonly executions = new Map<string, string>();
     private readonly activeJobs = new Set<string>();
+    // Runtime quota is per engine instance; durable cross-instance accounting is not
+    // available until the control plane provides generation-checked usage storage.
     private readonly usage = new Map<string, { day: string; seconds: number }>();
     private readonly started = Date.now();
 
@@ -87,6 +91,7 @@ type ObjectStore = {
       this.bucketName = bucketName;
       this.store = options.store ?? new GcsStore(new Storage({ projectId: project }).bucket(bucketName));
       this.run = options.run ?? this.createRunClient(project, region, job);
+      this.storageToken = options.storageToken;
     }
 
     async create(_config: RealmConfig) { return randomUUID(); }
@@ -123,12 +128,9 @@ type ObjectStore = {
         return { path: name.replace(`realms/${realmId}/files/`, ''), name: value, sizeBytes: data.length };
       }));
     }
-    async setNetworkMode(realmId: string, mode: NetworkMode) {
-      if (mode === NetworkMode.Disabled) {
-        await this.store.save(`realms/${realmId}/network-policy.json`, Buffer.from(JSON.stringify({ mode: 'none', blocked: ['169.254.169.254', 'metadata.google.internal'] })));
-      } else {
-        await this.store.save(`realms/${realmId}/network-policy.json`, Buffer.from(JSON.stringify({ mode })));
-      }
+    async setNetworkMode(_realmId: string, _mode: NetworkMode) {
+      // Cloud Run does not provide per-realm egress control here. Enforcing it
+      // requires VPC egress configuration, which is outside this engine.
     }
     async putFile(realmId: string, path: string, data: Buffer | NodeJS.ReadableStream) {
       const safe = this.safePath(path);
@@ -149,6 +151,7 @@ type ObjectStore = {
       this.activeJobs.add(realmId);
       this.usage.set(realmId, { day, seconds: used + timeoutSec });
       const jobId = randomUUID();
+      const storageToken = await this.createRealmStorageToken(realmId);
       const execution = await this.run.runJob({
         name: `projects/${this.project}/locations/${this.region}/jobs/${this.job}`,
         overrides: {
@@ -163,7 +166,7 @@ type ObjectStore = {
               { name: 'JOB_TIMEOUT_SECONDS', value: String(timeoutSec) },
               { name: 'JOB_SPEC_ENV', value: JSON.stringify(spec.env ?? {}) },
               { name: 'REALM_PREFIX', value: `realms/${realmId}/` },
-              { name: 'NETWORK_POLICY', value: 'metadata-deny,egress-allowlist' },
+              { name: 'REALM_STORAGE_TOKEN', value: storageToken },
             ],
           }],
         },
@@ -209,6 +212,17 @@ type ObjectStore = {
       await this.run.cancelExecution(name);
       this.activeJobs.delete(realmId);
     }
+    private async createRealmStorageToken(realmId: string): Promise<string> {
+      if (this.storageToken) return this.storageToken(realmId);
+      const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+      const source = await auth.getClient();
+      const accessBoundary = createRealmAccessBoundary(this.bucketName, realmId);
+      const client = new DownscopedClient(source, accessBoundary);
+      const headers = await client.getRequestHeaders();
+      const authorization = headers.Authorization ?? headers.authorization;
+      if (!authorization) throw new Error('failed to mint realm-scoped storage token');
+      return authorization.replace(/^Bearer\\s+/i, '');
+    }
     private safePath(path: string) {
       const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
       if (!normalized || normalized.split('/').some(part => part === '..' || part === '.')) throw new Error('invalid relative path');
@@ -228,6 +242,21 @@ type ObjectStore = {
         async cancelExecution(name) { const client: any = await auth.getClient(); await client.request({ url: `https://run.googleapis.com/v2/${name}:cancel`, method: 'POST' }); }
       };
     }
+  }
+
+  export function createRealmAccessBoundary(bucketName: string, realmId: string) {
+    return {
+      accessBoundary: {
+        accessBoundaryRules: [{
+          availableResource: `//storage.googleapis.com/projects/_/buckets/${bucketName}`,
+          availablePermissions: ['inRole:roles/storage.objectAdmin'],
+          availabilityCondition: {
+            title: 'realm-prefix',
+            expression: `resource.name.startsWith('projects/_/buckets/${bucketName}/objects/realms/${realmId}/')`,
+          },
+        }],
+      },
+    };
   }
 
   export { GcsStore };
