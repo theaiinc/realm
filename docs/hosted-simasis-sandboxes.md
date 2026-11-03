@@ -44,11 +44,11 @@ Initial policy defaults:
 |---|---:|---|
 | CPU | 1 vCPU burst, configurable ceiling | Cloudflare container/resource setting |
 | Memory | 2 GiB | container limit; terminate on breach |
-| Disk | 10 GiB | quota before sync and during writes |
+| Disk | 10 GiB workspace plus bounded temporary space | quota before sync and during writes |
 | Processes | 128 total, 32 per session/process tree | PID/cgroup/container policy |
 | Idle shutdown | 15 minutes without terminal/exec activity | Realm lifecycle timer |
 | Maximum PTY session | 2 hours | forced TERM then KILL |
-| Maximum one-shot exec | lower default for agent calls | execution timeout |
+| Maximum one-shot exec | 6 hours, lower default for agent calls | execution timeout |
 | Daily compute | 60 CPU-minutes per user initially | Simasis/Realm quota ledger |
 | Concurrent terminals | 1 per user | durable per-user session lock |
 | Concurrent execs | 1 while PTY is active; otherwise 1 | per-user scheduler |
