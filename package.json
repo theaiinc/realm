@@ -12,7 +12,7 @@
     "url": "https://github.com/theaiinc/realm/issues"
   },
   "scripts": {
-    "build": "pnpm -r --filter='./packages/*' exec npx tsup src/index.ts --format esm --dts --clean || true && cd packages/realm-api && npx tsup src/server.ts --format esm --clean && cd ../../packages/realm-cli && npx tsup src/cli.ts --format esm --clean",
+    "build": "corepack pnpm --filter @theaiinc/realm-core build && corepack pnpm --filter @theaiinc/realm-container build && corepack pnpm --filter @theaiinc/realm-cloudrun build && corepack pnpm --filter @theaiinc/realm-api build && corepack pnpm --filter @theaiinc/realm-cli build && corepack pnpm --filter @theaiinc/realm-browser build && corepack pnpm --filter @theaiinc/realm-veil build && corepack pnpm --filter @theaiinc/realm-cloudflare typecheck",
     "test": "cd packages/realm-core && npx vitest run && cd ../../packages/realm-container && npx vitest run && cd ../../packages/realm-browser && npx vitest run && cd ../../packages/realm-veil && npx vitest run && cd ../../packages/realm-api && npx vitest run && cd ../../packages/realm-cloudflare && npx vitest run",
     "realm": "node packages/realm-cli/dist/cli.js",
     "realm:api": "node packages/realm-api/dist/server.js",
