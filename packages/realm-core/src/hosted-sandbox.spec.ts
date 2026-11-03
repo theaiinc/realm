@@ -68,12 +68,14 @@ describe('hosted sandbox core policy', () => {
       };
       expect(checkEgress(policy, { host: 'github.com', method: 'GET', path: '/other' }).decision).toBe('deny');
       expect(checkEgress(policy, { host: 'example.com', method: 'GET', path: '/' }).decision).toBe('deny');
-      expect(checkEgress(policy, { host: 'GITHUB.COM:443.', method: 'GET', path: '/org/repo' }).decision).toBe('allow');
+      expect(checkEgress(policy, { host: 'GITHUB.COM.:443', method: 'GET', path: '/org/repo' }).decision).toBe('allow');
     });
 
     it('enforces execution timeout and resource limits', () => {
       const request: ExecRequest = { command: 'npm test', timeoutSec: FREE_PLAN_LIMITS.maxExecDurationSec + 1 };
       expect(() => assertExecAllowed(request, FREE_PLAN_LIMITS)).toThrow('exec timeout');
+      expect(() => assertExecAllowed({ command: 'nan', timeoutSec: Number.NaN } as ExecRequest, FREE_PLAN_LIMITS)).toThrow('exec timeout');
+      expect(() => assertExecAllowed({ command: 'infinite', timeoutSec: Number.POSITIVE_INFINITY } as ExecRequest, FREE_PLAN_LIMITS)).toThrow('exec timeout');
       expect(DEFAULT_RESOURCE_LIMITS).toMatchObject({
         memoryBytes: 2 * 1024 ** 3,
         maxProcesses: 128,
@@ -92,6 +94,11 @@ describe('hosted sandbox core policy', () => {
       expect(() => validateExecEnv({ APIKEY: 'safe-looking' })).toThrow();
       expect(() => validateExecEnv({ GH_PAT: 'safe-looking' })).toThrow();
       expect(() => validateExecEnv({ SAFE_MODE: 'https://user:password@example.com' })).toThrow();
+      expect(() => validateExecEnv({ SAFE_MODE: 'ghp_exampletoken' })).toThrow();
+      expect(() => validateExecEnv({ SAFE_MODE: 'github_pat_exampletoken' })).toThrow();
+      expect(() => validateExecEnv({ SAFE_MODE: 'sk-exampletoken' })).toThrow();
+      expect(() => validateExecEnv({ SAFE_MODE: 'AKIA1234567890ABCDEF' })).toThrow();
+      expect(() => validateExecEnv({ SAFE_MODE: '-----BEGIN RSA PRIVATE KEY-----' })).toThrow();
       expect(() => validateExecEnv({ SAFE_MODE: '1' })).not.toThrow();
     });
   });

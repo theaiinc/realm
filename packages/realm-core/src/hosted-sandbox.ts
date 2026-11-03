@@ -48,7 +48,7 @@ export interface ExecRequest {
 export interface ExecState { executionId: string; state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out'; exitCode?: number; output: string; nextOffset: number; }
 
 const SECRET_ENV_KEY = /(?:TOKEN|SECRET|APIKEY|GH_PAT|PASSWORD|KEY)$/i;
-const SECRET_ENV_VALUE = /(?:arcana:\/\/|bearer\s+|(?:token|secret|password|api[_-]?key)\s*[:=]|https?:\/\/[^/\s:@]+:[^/\s@]+@)/i;
+const SECRET_ENV_VALUE = /(?:arcana:\/\/|bearer\s+|(?:token|secret|password|api[_-]?key)\s*[:=]|[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@|(?:ghp_|github_pat_|sk-|AKIA[A-Z0-9]{16})|-----BEGIN [A-Z ]*PRIVATE KEY-----)/i;
 
 export function validateExecEnv(env: Record<string, string> | undefined): void {
   for (const [key, value] of Object.entries(env ?? {})) {
@@ -81,7 +81,7 @@ export interface EgressCheckRequest { host: string; method: string; path: string
 export interface EgressCheckResult { decision: 'allow' | 'deny'; reason: string; }
 
 function normalizeHost(host: string): string {
-  return host.trim().toLowerCase().replace(/\.$/, '').replace(/:\d+$/, '');
+  return host.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }
 
 export function checkEgress(policy: EgressPolicy, request: EgressCheckRequest): EgressCheckResult {
@@ -117,7 +117,7 @@ export const DEFAULT_RESOURCE_LIMITS: Readonly<ResourceLimits> = {
 };
 
 export function assertExecAllowed(request: ExecRequest, limits: Pick<ResourceLimits, 'maxExecDurationSec'>): void {
-  if (request.timeoutSec !== undefined && request.timeoutSec > limits.maxExecDurationSec) {
+  if (request.timeoutSec !== undefined && (!Number.isFinite(request.timeoutSec) || request.timeoutSec > limits.maxExecDurationSec)) {
     throw new Error('exec timeout exceeds limit');
   }
 }

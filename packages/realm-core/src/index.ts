@@ -60,7 +60,7 @@ export type {
   EgressCheckRequest, EgressCheckResult, ResourceLimits,
 } from './hosted-sandbox.js';
 export {
-  FREE_PLAN_LIMITS, limitsForPlan, DEFAULT_RESOURCE_LIMITS, assertExecAllowed, checkEgress, validateExecEnv,
+  DEFAULT_RESOURCE_LIMITS, assertExecAllowed, checkEgress, validateExecEnv,
 } from './hosted-sandbox.js';
 export {
   defaultPermissionChecker,
