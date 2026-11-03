@@ -44,16 +44,20 @@ Initial policy defaults:
 |---|---:|---|
 | CPU | 1 vCPU burst, configurable ceiling | Cloudflare container/resource setting |
 | Memory | 2 GiB | container limit; terminate on breach |
-| Disk | Per-plan configured workspace plus bounded temporary space; 10 GiB for unknown/free plans | quota before sync and during writes |
+| Disk | Bounded workspace plus temporary space | quota before sync and during writes |
 | Processes | 128 total, 32 per session/process tree | PID/cgroup/container policy |
 | Idle shutdown | 15 minutes without terminal/exec activity | Realm lifecycle timer |
 | Maximum PTY session | 2 hours | forced TERM then KILL |
-| Maximum one-shot exec | Per-plan configured limit; 6 hours for unknown/free plans | execution timeout |
-| Daily compute | Per-plan quota from configuration; 60 CPU-minutes for unknown/free plans | Simasis/Realm quota ledger |
+| Maximum one-shot exec | 6 hours | execution timeout |
+| Daily compute | 60 CPU-minutes | Simasis/Realm quota ledger |
 | Concurrent terminals | 1 per user | durable per-user session lock |
 | Concurrent execs | 1 while PTY is active; otherwise 1 | per-user scheduler |
 
 Rejected requests return a stable limit error and create an audit event. Quota values are configuration, not a bypassable client field. Cloudflare/container limits and actual pricing must be confirmed before implementation; the design does not assume that a particular Cloudflare plan supports these exact controls.
+
+### Open questions
+
+Per-plan resource limits may be useful for future product tiers, but they are not part of this approved baseline and must not change these defaults without an explicit design decision from Steve.
 
 ## Network policy
 

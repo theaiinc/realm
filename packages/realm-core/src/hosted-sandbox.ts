@@ -17,7 +17,14 @@ export const FREE_PLAN_LIMITS: Readonly<PlanLimits> = {
 export type PlanLimitsMap = Readonly<Record<PlanId, PlanLimits>>;
 
 export function limitsForPlan(plan: string | undefined, configured: PlanLimitsMap): PlanLimits {
-  return configured[plan ?? ''] ?? configured.free ?? FREE_PLAN_LIMITS;
+  if (plan === undefined) {
+    const freeLimits = configured.free;
+    return freeLimits === undefined ? FREE_PLAN_LIMITS : freeLimits;
+  }
+  if (!Object.hasOwn(configured, plan)) throw new Error(`unknown plan: ${plan}`);
+  const limits = configured[plan];
+  if (limits === undefined) throw new Error(`unknown plan: ${plan}`);
+  return limits;
 }
 
 export interface PtyOpenRequest { cwd?: string; cols?: number; rows?: number; command?: string; }
@@ -40,11 +47,12 @@ export interface ExecRequest {
 }
 export interface ExecState { executionId: string; state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out'; exitCode?: number; output: string; nextOffset: number; }
 
-const SECRET_ENV_KEY = /(?:_TOKEN|_SECRET|_KEY|PASSWORD)$/i;
+const SECRET_ENV_KEY = /(?:TOKEN|SECRET|APIKEY|GH_PAT|PASSWORD|KEY)$/i;
+const SECRET_ENV_VALUE = /(?:arcana:\/\/|bearer\s+|(?:token|secret|password|api[_-]?key)\s*[:=]|https?:\/\/[^/\s:@]+:[^/\s@]+@)/i;
 
 export function validateExecEnv(env: Record<string, string> | undefined): void {
   for (const [key, value] of Object.entries(env ?? {})) {
-    if (SECRET_ENV_KEY.test(key) || value.startsWith('arcana://')) {
+    if (SECRET_ENV_KEY.test(key) || SECRET_ENV_VALUE.test(value)) {
       throw new Error(`secret environment value is not allowed: ${key}`);
     }
   }
@@ -72,9 +80,15 @@ export interface EgressPolicy {
 export interface EgressCheckRequest { host: string; method: string; path: string; }
 export interface EgressCheckResult { decision: 'allow' | 'deny'; reason: string; }
 
+function normalizeHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\.$/, '').replace(/:\d+$/, '');
+}
+
 export function checkEgress(policy: EgressPolicy, request: EgressCheckRequest): EgressCheckResult {
-  const rule = policy.allowedHosts[request.host];
-  if (!rule) return { decision: 'deny', reason: 'host_not_allowed' };
+  const host = normalizeHost(request.host);
+  const rule = Object.entries(policy.allowedHosts).find(([allowedHost]) => normalizeHost(allowedHost) === host)?.[1];
+  if (policy.denyByDefault !== true || !rule) return { decision: 'deny', reason: 'host_not_allowed' };
+  if (!rule.methods && !rule.paths) return { decision: 'deny', reason: 'rule_has_no_constraints' };
   if (rule.methods && !rule.methods.some((method) => method.toUpperCase() === request.method.toUpperCase())) {
     return { decision: 'deny', reason: 'method_not_allowed' };
   }
@@ -89,14 +103,21 @@ export interface ResourceLimits {
   idleShutdownSec: number;
   maxConcurrentTerminals: number;
   maxConcurrentExecs: number;
+  maxExecDurationSec: number;
 }
 
-export class DeterministicFakeBroker implements Broker {
-  constructor(private readonly allowedHosts: ReadonlySet<string> = new Set()) {}
-  readonly requests: EgressAuthorizeRequest[] = [];
-  async authorize(request: EgressAuthorizeRequest): Promise<EgressDecision> {
-    this.requests.push(request);
-    if (!this.allowedHosts.has(request.host)) return { decision: 'deny', reason: 'host_not_allowed' };
-    return { decision: 'allow', lease: `fake-lease-${this.requests.length}`, expiresAt: '2099-01-01T00:00:00.000Z' };
+export const DEFAULT_RESOURCE_LIMITS: Readonly<ResourceLimits> = {
+  memoryBytes: 2 * 1024 ** 3,
+  maxProcesses: 128,
+  maxProcessesPerSession: 32,
+  idleShutdownSec: 15 * 60,
+  maxConcurrentTerminals: 1,
+  maxConcurrentExecs: 1,
+  maxExecDurationSec: 6 * 60 * 60,
+};
+
+export function assertExecAllowed(request: ExecRequest, limits: Pick<ResourceLimits, 'maxExecDurationSec'>): void {
+  if (request.timeoutSec !== undefined && request.timeoutSec > limits.maxExecDurationSec) {
+    throw new Error('exec timeout exceeds limit');
   }
 }
