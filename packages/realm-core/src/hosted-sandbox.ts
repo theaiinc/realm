@@ -27,7 +27,7 @@ export function limitsForPlan(plan: string | undefined, configured: PlanLimitsMa
   return limits;
 }
 
-export interface PtyOpenRequest { cwd?: string; cols?: number; rows?: number; command?: string; }
+export interface PtyOpenRequest { cwd?: string; cols?: number; rows?: number; command?: string; timeoutSec?: number; }
 export interface PtySession { sessionId: string; cols: number; rows: number; }
 export interface PtyOutput { data: string; nextOffset: number; closed: boolean; exitCode?: number; }
 export interface PtyAdapter {

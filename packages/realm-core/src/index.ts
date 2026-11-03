@@ -67,5 +67,4 @@ export {
   strictPermissionChecker,
 } from './filesystem.js';
 
-export { FolderPtyAdapter } from './folder-pty.js';
-export type { FolderPtyOptions } from './folder-pty.js';
+// Node-only adapters are exported from @theaiinc/realm-core/node.
