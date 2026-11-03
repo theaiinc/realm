@@ -81,7 +81,7 @@ export interface EgressCheckRequest { host: string; method: string; path: string
 export interface EgressCheckResult { decision: 'allow' | 'deny'; reason: string; }
 
 function normalizeHost(host: string): string {
-  return host.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+  return host.trim().toLowerCase().replace(/:\d+\.?$/, '').replace(/\.$/, '');
 }
 
 export function checkEgress(policy: EgressPolicy, request: EgressCheckRequest): EgressCheckResult {
