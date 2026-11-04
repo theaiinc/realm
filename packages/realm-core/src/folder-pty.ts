@@ -242,29 +242,22 @@ export class FolderPtyAdapter implements PtyAdapter {
     if (session.terminating || session.closed) return;
     session.terminating = true;
     void this.audit(session, reason === 'timeout' ? 'timeout' : 'destroy', true, { reason });
-    session.closed = true;
     session.exitCode ??= 143;
-    this.closed.set(session.id, {
-      data: session.output,
-      nextOffset: session.output.length,
-      closed: true,
-      exitCode: session.exitCode,
-    });
     if (session.timer) clearTimeout(session.timer);
     const descendants = this.processTree(session.process.pid);
     for (const pid of descendants) {
-      try { process.kill(pid, 'SIGTERM'); } catch {}
+      try { process.kill(pid, 'SIGTERM'); } catch { void 0; }
     }
     try { process.kill(-session.process.pid, 'SIGTERM'); } catch {
-      try { session.process.kill(); } catch {}
+      try { session.process.kill(); } catch { void 0; }
     }
     session.killTimer = setTimeout(() => {
       if (!session.terminating) return;
       for (const pid of this.processTree(session.process.pid)) {
-        try { process.kill(pid, 'SIGKILL'); } catch {}
+        try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
       }
       try { process.kill(-session.process.pid, 'SIGKILL'); } catch {
-        try { session.process.kill(); } catch {}
+        try { session.process.kill(); } catch { void 0; }
       }
     }, TERM_GRACE_MS);
   }
