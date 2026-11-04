@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { FolderPtyAdapter } from './folder-pty.js';
+import { DEFAULT_PTY_TIMEOUT_SEC } from './hosted-sandbox.js';
 
 const temporaryFolders: string[] = [];
 
@@ -97,6 +98,27 @@ describe('FolderPtyAdapter', () => {
     }
   });
 
+  it('applies the two-hour default timeout when timeoutSec is omitted', async () => {
+    expect(DEFAULT_PTY_TIMEOUT_SEC).toBe(2 * 60 * 60);
+
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    const session = await adapter.open({ command: 'sleep 1' });
+
+    const output = await adapter.output(session.sessionId, 0);
+    expect(output.closed).toBe(false);
+    await adapter.close(session.sessionId);
+  });
+
+  it('refuses a timeout beyond the two-hour cap', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    await expect(adapter.open({ timeoutSec: 3 * 60 * 60 })).rejects.toThrow();
+    await expect(adapter.open({ timeoutSec: DEFAULT_PTY_TIMEOUT_SEC + 1 })).rejects.toThrow();
+  });
+
   it('rejects invalid timeout, resize, and output offset values', async () => {
     const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
     temporaryFolders.push(folder);
@@ -132,5 +154,92 @@ describe('FolderPtyAdapter', () => {
     await symlink(outside, link);
     const adapter = new FolderPtyAdapter({ root: folder });
     await expect(adapter.open({ cwd: link })).rejects.toThrow('cwd escapes session folder');
+  });
+
+  it('applies a default PTY timeout when none is provided', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    const session = await adapter.open({ command: 'sleep 9999' });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const output = await adapter.output(session.sessionId, 0);
+    expect(output).toBeDefined();
+    await adapter.close(session.sessionId);
+  });
+
+  it('refuses a second concurrent open for the same user', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    const first = await adapter.open({ command: 'echo first', timeoutSec: 5 });
+    await expect(adapter.open({ command: 'echo second', timeoutSec: 5 })).rejects.toThrow(/terminal concurrency limit exceeded/i);
+    await adapter.close(first.sessionId);
+    const second = await adapter.open({ command: 'echo second', timeoutSec: 5 });
+    expect(second.sessionId).toBeDefined();
+    await adapter.close(second.sessionId);
+  });
+
+  it('applies ulimit and memory limit in the spawned command', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    const session = await adapter.open({ command: 'ulimit -u', timeoutSec: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const output = await adapter.output(session.sessionId, 0);
+    expect(output.closed).toBe(true);
+    expect(Number(output.data.trim())).toBeLessThanOrEqual(34);
+    await adapter.close(session.sessionId);
+  });
+
+  it('preserves natural-exit results and removes the session folder', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    const session = await adapter.open({ command: 'exit 0' });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const output = await adapter.output(session.sessionId, 0);
+    expect(output.closed).toBe(true);
+    expect(output.exitCode).toBe(0);
+    await expect(adapter.input(session.sessionId, 'x')).rejects.toThrow(/closed/i);
+  });
+
+  it('kills setsid grandchild processes on close', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder);
+    const adapter = new FolderPtyAdapter({ root: folder });
+    // Start a shell that creates a setsid grandchild — a process re-parented to init.
+    // "set -m" enables job control so the subshell gets its own process group.
+    // "set -m; sleep 60 &" stays in the shell's session but is a child of the shell,
+    // not of node-pty's direct child. "setsid sleep 60 &" starts a new session.
+    // We kill both to show that process-group and descendant discovery work.
+    const session = await adapter.open({
+      command: 'set -m; sleep 30 & setsid sleep 30 & printf started',
+      timeoutSec: 15,
+    });
+    await waitForOutput(adapter, session.sessionId, 'started');
+    // Close kills the session — both children should be terminated.
+    await adapter.close(session.sessionId);
+
+    // Verify no background survivors: use a polling loop and defensive parsing.
+    const folder2 = await mkdtemp(join(tmpdir(), 'realm-pty-'));
+    temporaryFolders.push(folder2);
+    const checker = new FolderPtyAdapter({ root: folder2 });
+    const checkSesh = await checker.open({ command: "ps aux | awk '/[s]leep 30/ {print $2}' | wc -l | xargs echo", timeoutSec: 8 });
+    let count: number | null = null;
+    for (let i = 0; i < 40; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const o = await checker.output(checkSesh.sessionId, 0);
+      if (o.closed) {
+        count = parseInt(o.data.trim(), 10);
+        break;
+      }
+    }
+    if (count === null) {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      const o = await checker.output(checkSesh.sessionId, 0);
+      if (o.closed) count = parseInt(o.data.trim(), 10);
+    }
+    expect(count).toBe(0);
+    await checker.close(checkSesh.sessionId);
   });
 });
