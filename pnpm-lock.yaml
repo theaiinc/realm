@@ -191,10 +191,6 @@ importers:
         version: 3.2.6(@types/node@20.19.43)(supports-color@10.2.2)
 
   packages/realm-core:
-    dependencies:
-      node-pty:
-        specifier: ^1.1.0
-        version: 1.1.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -208,6 +204,10 @@ importers:
       vitest:
         specifier: ^3.2.0
         version: 3.2.6(@types/node@20.19.43)(supports-color@10.2.2)
+    optionalDependencies:
+      node-pty:
+        specifier: ^1.1.0
+        version: 1.1.0
 
   packages/realm-guacd: {}
 
@@ -4651,7 +4651,8 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  node-addon-api@7.1.1: {}
+  node-addon-api@7.1.1:
+    optional: true
 
   node-fetch@2.7.0:
     dependencies:
@@ -4660,6 +4661,7 @@ snapshots:
   node-pty@1.1.0:
     dependencies:
       node-addon-api: 7.1.1
+    optional: true
 
   object-assign@4.1.1: {}
 

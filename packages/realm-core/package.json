@@ -53,7 +53,7 @@
   "bugs": {
     "url": "https://github.com/theaiinc/realm/issues"
   },
-  "dependencies": {
+  "optionalDependencies": {
     "node-pty": "^1.1.0"
   }
 }

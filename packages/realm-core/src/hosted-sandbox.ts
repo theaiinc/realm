@@ -106,6 +106,8 @@ export interface ResourceLimits {
   maxExecDurationSec: number;
 }
 
+export const DEFAULT_PTY_TIMEOUT_SEC = 2 * 60 * 60;
+
 export const DEFAULT_RESOURCE_LIMITS: Readonly<ResourceLimits> = {
   memoryBytes: 2 * 1024 ** 3,
   maxProcesses: 128,
@@ -117,7 +119,7 @@ export const DEFAULT_RESOURCE_LIMITS: Readonly<ResourceLimits> = {
 };
 
 export function assertExecAllowed(request: ExecRequest, limits: Pick<ResourceLimits, 'maxExecDurationSec'>): void {
-  if (request.timeoutSec !== undefined && (!Number.isFinite(request.timeoutSec) || request.timeoutSec > limits.maxExecDurationSec)) {
+  if (request.timeoutSec !== undefined && (!Number.isFinite(request.timeoutSec) || request.timeoutSec <= 0 || request.timeoutSec > limits.maxExecDurationSec)) {
     throw new Error('exec timeout exceeds limit');
   }
 }
