@@ -64,7 +64,14 @@ export function killSessionTree(pid: number): void {
       const members = execFileSync('ps', ['-eo', 'pid=,sid='], { encoding: 'utf8' })
         .split('\n')
         .map((line) => line.trim().split(/\s+/).map(Number))
-        .filter(([memberPid, memberSid]) => memberSid === Number(sid) && memberPid > 0 && memberPid !== pid)
+        .filter((parts): parts is [number, number] => {
+                const [memberPid, memberSid] = parts;
+                return memberPid !== undefined
+                  && memberSid !== undefined
+                  && memberSid === Number(sid)
+                  && memberPid > 0
+                  && memberPid !== pid;
+              })
         .map(([memberPid]) => memberPid);
       for (const memberPid of members) {
         try { process.kill(memberPid, 'SIGTERM'); } catch { void 0; }
