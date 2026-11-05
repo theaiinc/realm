@@ -20,6 +20,72 @@ export interface FolderPtyOptions {
   sandboxId?: string;
 }
 
+/** Terminate a process and every process in its POSIX session. */
+export function killSessionTree(pid: number): void {
+  if (process.platform === 'win32') {
+    try { process.kill(pid, 'SIGTERM'); } catch { void 0; }
+    setTimeout(() => {
+      try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
+    }, 1000);
+    return;
+  }
+
+  const descendants: number[] = [];
+  try {
+    const lines = execFileSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8' });
+    const children = new Map<number, number[]>();
+    for (const line of lines.trim().split('\n')) {
+      const [childText, parentText] = line.trim().split(/\s+/);
+      const child = Number(childText);
+      const parent = Number(parentText);
+      if (Number.isInteger(child) && Number.isInteger(parent)) {
+        children.set(parent, [...(children.get(parent) ?? []), child]);
+      }
+    }
+    const pending = [...(children.get(pid) ?? [])];
+    while (pending.length > 0) {
+      const child = pending.pop()!;
+      descendants.push(child);
+      pending.push(...(children.get(child) ?? []));
+    }
+  } catch { /* best effort */ }
+  let sid: string | undefined;
+  try {
+    sid = execFileSync('ps', ['-o', 'sid=', '-p', String(pid)], { encoding: 'utf8' }).trim() || undefined;
+  } catch { /* best effort */ }
+
+  // Kill descendants first so setsid children are not orphaned before cleanup.
+  for (const descendant of descendants.reverse()) {
+    try { process.kill(descendant, 'SIGKILL'); } catch { void 0; }
+  }
+  try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
+  if (sid) {
+    try {
+      const members = execFileSync('ps', ['-eo', 'pid=,sid='], { encoding: 'utf8' })
+        .split('\n')
+        .map((line) => line.trim().split(/\s+/).map(Number))
+        .filter(([memberPid, memberSid]) => memberSid === Number(sid) && memberPid > 0 && memberPid !== pid)
+        .map(([memberPid]) => memberPid);
+      for (const memberPid of members) {
+        try { process.kill(memberPid, 'SIGTERM'); } catch { void 0; }
+      }
+    } catch { void 0; }
+    try { execFileSync('pkill', ['-TERM', '-s', sid, '-P', String(pid)]); } catch { void 0; }
+  }
+  try { process.kill(-pid, 'SIGTERM'); } catch { void 0; }
+  // Give a waiting parent a chance to reap children before escalation.
+  try { execFileSync('sleep', ['0.1']); } catch { void 0; }
+  try { process.kill(pid, 'SIGTERM'); } catch { void 0; }
+
+  setTimeout(() => {
+    if (sid) {
+      try { execFileSync('pkill', ['-KILL', '-s', sid]); } catch { void 0; }
+    }
+    try { process.kill(-pid, 'SIGKILL'); } catch { void 0; }
+    try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
+  }, 1000);
+}
+
 interface RunningSession {
   id: string;
   cwd: string;
@@ -241,17 +307,18 @@ export class FolderPtyAdapter implements PtyAdapter {
   private collectChildPids(rootPid: number): number[] {
     // Discover all descendant PIDs and their process-group IDs so that
     // processes reparented to init (e.g. setsid children) are also found
-    // by their process group.
+    // by their process group. Also track by session ID so that a setsid'd
+    // child (new pgid == its own pid, but same sid) is not missed.
     const pids = this.processTree(rootPid);
     if (process.platform === 'win32') return pids;
     try {
-      const pgidStr = execFileSync('ps', ['-o', 'pgid=', '-p', String(rootPid)], { encoding: 'utf8' }).trim();
-      const pgid = Number(pgidStr);
-      if (Number.isInteger(pgid)) {
-        const pgLines = execFileSync('ps', ['-eo', 'pid=,pgid='], { encoding: 'utf8' });
-        for (const line of pgLines.trim().split('\n')) {
-          const [pidText, pgidText] = line.trim().split(/\s+/);
-          if (Number(pgidText) === pgid) {
+      const sidStr = execFileSync('ps', ['-o', 'sid=', '-p', String(rootPid)], { encoding: 'utf8' }).trim();
+      const sid = Number(sidStr);
+      if (Number.isInteger(sid)) {
+        const allLines = execFileSync('ps', ['-eo', 'pid=,sid='], { encoding: 'utf8' });
+        for (const line of allLines.trim().split('\n')) {
+          const [pidText, sidText] = line.trim().split(/\s+/);
+          if (Number(sidText) === sid) {
             const pid = Number(pidText);
             if (Number.isInteger(pid) && !pids.includes(pid)) pids.push(pid);
           }
@@ -267,22 +334,19 @@ export class FolderPtyAdapter implements PtyAdapter {
     void this.audit(session, reason === 'timeout' ? 'timeout' : 'destroy', true, { reason });
     session.exitCode ??= 143;
     if (session.timer) clearTimeout(session.timer);
-    const allPids = this.collectChildPids(session.process.pid);
-    for (const pid of allPids) {
-      if (pid === session.process.pid) continue;
+
+    const sessionPids = this.collectChildPids(session.process.pid);
+    for (const pid of sessionPids) {
       try { process.kill(pid, 'SIGTERM'); } catch { void 0; }
     }
-    try { process.kill(-session.process.pid, 'SIGTERM'); } catch {
-      try { session.process.kill(); } catch { void 0; }
-    }
+    killSessionTree(session.process.pid);
     session.killTimer = setTimeout(() => {
       if (!session.terminating) return;
       const retryPids = this.collectChildPids(session.process.pid);
       for (const pid of retryPids) {
-        if (pid === session.process.pid) continue;
         try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
       }
-      this.terminate(session);
+      try { session.process.kill(); } catch { void 0; }
     }, 1000);
   }
 
