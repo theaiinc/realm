@@ -1,0 +1,25 @@
+name: macOS PTY validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  realm-core-pty:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Ensure node-pty spawn helper is executable
+        run: |
+          find node_modules packages -path '*/node-pty/*/spawn-helper' -type f -exec chmod +x {} +
+      - run: pnpm --filter @theaiinc/realm-core test
+      - run: pnpm --filter @theaiinc/realm-core build

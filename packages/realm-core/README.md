@@ -36,6 +36,12 @@ api.registerEngine(myEngine);
 const session = await api.create({ type: EngineType.Container });
 ```
 
+## Local folder PTY adapter
+
+The Node-only `@theaiinc/realm-core/node` entry exports `FolderPtyAdapter` for local development and tests. It provides a confined working directory and bounded session behavior, but it is **not a security sandbox**: shells can still read host files and use host kernel capabilities. Production isolation must be supplied by a hardened container, VM, or equivalent wrapper.
+
+`node-pty` is an optional dependency used only by this adapter. On macOS, ensure the package's `spawn-helper` is executable after installation (for example, run `chmod +x node_modules/node-pty/prebuilds/*/spawn-helper` when the package manager preserves incorrect permissions).
+
 ## License
 
 MIT

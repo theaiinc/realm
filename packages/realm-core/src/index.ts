@@ -66,3 +66,5 @@ export {
   defaultPermissionChecker,
   strictPermissionChecker,
 } from './filesystem.js';
+
+// Node-only adapters are exported from @theaiinc/realm-core/node.
