@@ -54,11 +54,10 @@ export function killSessionTree(pid: number): void {
     sid = execFileSync('ps', ['-o', 'sid=', '-p', String(pid)], { encoding: 'utf8' }).trim() || undefined;
   } catch { /* best effort */ }
 
-  // Kill descendants first so setsid children are not orphaned before cleanup.
+  // Ask descendants to exit first, then give the parent a chance to reap them.
   for (const descendant of descendants.reverse()) {
-    try { process.kill(descendant, 'SIGKILL'); } catch { void 0; }
+    try { process.kill(descendant, 'SIGTERM'); } catch { void 0; }
   }
-  try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
   if (sid) {
     try {
       const members = execFileSync('ps', ['-eo', 'pid=,sid='], { encoding: 'utf8' })
@@ -77,20 +76,23 @@ export function killSessionTree(pid: number): void {
         try { process.kill(memberPid, 'SIGTERM'); } catch { void 0; }
       }
     } catch { void 0; }
-    try { execFileSync('pkill', ['-TERM', '-s', sid, '-P', String(pid)]); } catch { void 0; }
+    try { execFileSync('pkill', ['-TERM', '-P', String(pid)]); } catch { void 0; }
   }
   try { process.kill(-pid, 'SIGTERM'); } catch { void 0; }
   // Give a waiting parent a chance to reap children before escalation.
-  try { execFileSync('sleep', ['0.1']); } catch { void 0; }
+  try { execFileSync('sleep', ['0.5']); } catch { void 0; }
   try { process.kill(pid, 'SIGTERM'); } catch { void 0; }
 
   setTimeout(() => {
+    for (const descendant of descendants) {
+      try { process.kill(descendant, 'SIGKILL'); } catch { void 0; }
+    }
     if (sid) {
       try { execFileSync('pkill', ['-KILL', '-s', sid]); } catch { void 0; }
     }
     try { process.kill(-pid, 'SIGKILL'); } catch { void 0; }
     try { process.kill(pid, 'SIGKILL'); } catch { void 0; }
-  }, 1000);
+  }, 250);
 }
 
 interface RunningSession {
@@ -182,11 +184,19 @@ export class FolderPtyAdapter implements PtyAdapter {
       TERM: 'xterm-256color',
     };
     const command = request.command;
-    const resourceLimits = [
-      `ulimit -u ${DEFAULT_RESOURCE_LIMITS.maxProcessesPerSession}`,
-      `ulimit -v ${Math.floor(MEMORY_LIMIT_BYTES / 1024)}`,
-      `ulimit -t ${DEFAULT_RESOURCE_LIMITS.maxExecDurationSec}`,
-    ].join('; ');
+    const platform = process.platform as NodeJS.Platform;
+    const resourceLimits = platform === 'darwin'
+      ? [
+          `ulimit -u ${DEFAULT_RESOURCE_LIMITS.maxProcessesPerSession}`,
+          'ulimit -n 256',
+          `ulimit -t ${DEFAULT_RESOURCE_LIMITS.maxExecDurationSec}`,
+        ].join('; ')
+      : [
+          `ulimit -u ${DEFAULT_RESOURCE_LIMITS.maxProcessesPerSession}`,
+          `ulimit -n 1024`,
+          `ulimit -v ${Math.floor(MEMORY_LIMIT_BYTES / 1024)}`,
+          `ulimit -t ${DEFAULT_RESOURCE_LIMITS.maxExecDurationSec}`,
+        ].join('; ');
     const shellArguments = command === undefined
       ? `${resourceLimits}; exec /bin/bash --noprofile --norc`
       : `${resourceLimits}; exec /bin/bash --noprofile --norc -c ${JSON.stringify(command)}`;

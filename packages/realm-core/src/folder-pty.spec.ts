@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { FolderPtyAdapter } from './folder-pty.js';
-import { DEFAULT_PTY_TIMEOUT_SEC } from './hosted-sandbox.js';
+import { FolderPtyAdapter, killSessionTree } from './folder-pty.js';
+import { DEFAULT_PTY_TIMEOUT_SEC, DEFAULT_RESOURCE_LIMITS } from './hosted-sandbox.js';
 
 const temporaryFolders: string[] = [];
 
@@ -188,21 +189,26 @@ describe('FolderPtyAdapter', () => {
     const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
     temporaryFolders.push(folder);
     const adapter = new FolderPtyAdapter({ root: folder });
-    const command = process.platform === 'darwin' ? 'ulimit -t; ulimit -v' : 'ulimit -u; ulimit -v';
+    const command = process.platform === 'darwin'
+      ? 'ulimit -t; ulimit -n; ulimit -u; ulimit -v'
+      : 'ulimit -u; ulimit -v';
     const session = await adapter.open({ command, timeoutSec: 1 });
     await new Promise((resolve) => setTimeout(resolve, 1200));
     const output = await adapter.output(session.sessionId, 0);
     expect(output.closed).toBe(true);
-    const limits = output.data.trim().split(/\s+/);
+    const rawLimits = output.data.trim().split(/\s+/);
+
     if (process.platform === 'darwin') {
-      // macOS does not enforce RLIMIT_AS, so virtual memory is reported as unlimited.
-      expect(Number(limits[0])).toBeLessThanOrEqual(900);
-      expect(limits[1]).toBe('unlimited');
+      const [rawCpu, rawOpenFiles, rawProcesses, rawMemory] = rawLimits;
+      expect(Number(rawCpu), `raw ulimit output: ${JSON.stringify(rawCpu)}`).toBeLessThanOrEqual(21600);
+      expect(Number(rawOpenFiles), `raw ulimit output: ${JSON.stringify(rawOpenFiles)}`).toBeLessThanOrEqual(256);
+      expect(Number(rawProcesses), `raw ulimit output: ${JSON.stringify(rawProcesses)}`).toBeLessThanOrEqual(32);
+      expect(rawMemory, 'macOS does not enforce RLIMIT_AS').toBe('unlimited');
     } else {
-      expect(Number(limits[0])).toBeLessThanOrEqual(34);
-      expect(Number(limits[1])).toBeLessThanOrEqual(2048 * 1024);
+      const [rawProcesses, rawMemory] = rawLimits;
+      expect(Number(rawProcesses), `raw ulimit output: ${JSON.stringify(rawProcesses)}`).toBeLessThanOrEqual(32);
+      expect(Number(rawMemory), `raw ulimit output: ${JSON.stringify(rawMemory)}`).toBeLessThanOrEqual(Math.floor(DEFAULT_RESOURCE_LIMITS.memoryBytes / 1024));
     }
-    await adapter.close(session.sessionId);
   });
 
   it('preserves natural-exit results and removes the session folder', async () => {
@@ -215,6 +221,48 @@ describe('FolderPtyAdapter', () => {
     expect(output.closed).toBe(true);
     expect(output.exitCode).toBe(0);
     await expect(adapter.input(session.sessionId, 'x')).rejects.toThrow(/closed/i);
+  });
+
+  it('kills a directly spawned setsid grandchild process', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'realm-pty-kill-'));
+    temporaryFolders.push(folder);
+    const pidFile = join(folder, 'gc.pid');
+    expect(isAbsolute(pidFile)).toBe(true);
+    const child = spawn('sh', ['-c', `setsid sleep 300 & echo $! > "${pidFile}"; wait`], { detached: true });
+
+    let gcPid: number | undefined;
+    try {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          const value = Number.parseInt((await readFile(pidFile, 'utf8')).trim(), 10);
+          if (Number.isInteger(value) && value > 0) {
+            gcPid = value;
+            break;
+          }
+        } catch {
+          // The shell may not have written the PID file yet.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(gcPid).toBeDefined();
+      killSessionTree(child.pid!);
+
+      let terminated = false;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          process.kill(gcPid!, 0);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+            terminated = true;
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(terminated).toBe(true);
+    } finally {
+      if (child.pid !== undefined) killSessionTree(child.pid);
+    }
   });
 
   it.skip('kills setsid grandchild processes on close', () => {
