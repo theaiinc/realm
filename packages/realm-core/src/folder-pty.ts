@@ -185,6 +185,7 @@ export class FolderPtyAdapter implements PtyAdapter {
     const resourceLimits = [
       `ulimit -u ${DEFAULT_RESOURCE_LIMITS.maxProcessesPerSession}`,
       `ulimit -v ${Math.floor(MEMORY_LIMIT_BYTES / 1024)}`,
+      `ulimit -t ${DEFAULT_RESOURCE_LIMITS.maxExecDurationSec}`,
     ].join('; ');
     const shellArguments = command === undefined
       ? `${resourceLimits}; exec /bin/bash --noprofile --norc`

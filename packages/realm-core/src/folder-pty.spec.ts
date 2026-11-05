@@ -188,11 +188,20 @@ describe('FolderPtyAdapter', () => {
     const folder = await mkdtemp(join(tmpdir(), 'realm-pty-'));
     temporaryFolders.push(folder);
     const adapter = new FolderPtyAdapter({ root: folder });
-    const session = await adapter.open({ command: 'ulimit -u', timeoutSec: 1 });
+    const command = process.platform === 'darwin' ? 'ulimit -t; ulimit -v' : 'ulimit -u; ulimit -v';
+    const session = await adapter.open({ command, timeoutSec: 1 });
     await new Promise((resolve) => setTimeout(resolve, 1200));
     const output = await adapter.output(session.sessionId, 0);
     expect(output.closed).toBe(true);
-    expect(Number(output.data.trim())).toBeLessThanOrEqual(34);
+    const limits = output.data.trim().split(/\s+/);
+    if (process.platform === 'darwin') {
+      // macOS does not enforce RLIMIT_AS, so virtual memory is reported as unlimited.
+      expect(Number(limits[0])).toBeLessThanOrEqual(900);
+      expect(limits[1]).toBe('unlimited');
+    } else {
+      expect(Number(limits[0])).toBeLessThanOrEqual(34);
+      expect(Number(limits[1])).toBeLessThanOrEqual(2048 * 1024);
+    }
     await adapter.close(session.sessionId);
   });
 
